@@ -2,14 +2,14 @@
 #include <cstring>
 #include <limits>
 
-bool Encode(std::string base, std::string source, std::string OutputFilePath, bool showimages, bool verbose);
-bool Decode(std::string encoded, std::string OutputFilePath, bool showimages, bool verbose);
+static bool output{false}, verbose{false}, multithreading{false}, showimages{false};
+static std::string OutputFilePath{"Encoded.png"};
+static unsigned int threads{0};
 
-bool output{false}, verbose{false}, multithreading{false}, showimages{false};
-std::string OutputFilePath{"Encoded.png"};
-unsigned int threads{0};
+bool Encode(std::string& base, std::string& source, std::string& OutputFilePath, bool& showimages, bool& verbose);
+bool Decode(std::string& encoded, std::string& OutputFilePath, bool& showimages, bool& verbose);
 
-void help() {
+static void help() {
 	std::cout << "------------------------------------------------------ Help "
 				 "------------------------------------------------------\n\n";
 	std::cout << "NAME\n\tImage Steganography Tool\n\n";
@@ -32,7 +32,7 @@ void help() {
 	std::cout << "AUTHOR\n\tDashwoodIce9\n\n";
 }
 
-bool LoopThroughArgs(int start, const int& argc, const char* argv[]) {
+static bool LoopThroughArgs(int start, const int& argc, const char* argv[]) {
 	for(int i = start; i < argc; ++i) {
 		if(!output && (!strcmp(argv[i], "/o") || !strcmp(argv[i], "/O") || !strcmp(argv[i], "output"))) {
 			output = true;

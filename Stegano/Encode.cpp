@@ -25,7 +25,7 @@ constexpr std::array<std::array<unsigned int, 3>, 12> BPCH{{{0, 0, 1},
 
 constexpr std::array<unsigned int, 5> PowersOfTwo{0x1, 0x2, 0x4, 0x8, 0x10};
 
-bool Encode(std::string base, std::string source, std::string OutputFilePath, bool showimages, bool verbose) {
+bool Encode(std::string& base, std::string& source, std::string& OutputFilePath, bool& showimages, bool& verbose) {
 	cv::Mat BaseImage{cv::imread(base, cv::IMREAD_COLOR)};
 	cv::Mat SourceImage{cv::imread(source, cv::IMREAD_COLOR)};
 	if(!BaseImage.data) {
