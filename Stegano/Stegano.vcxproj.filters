@@ -18,10 +18,13 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Encrypt.cpp">
+    <ClCompile Include="Encode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Decrypt.cpp">
+    <ClCompile Include="Decode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Handler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

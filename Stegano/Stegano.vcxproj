@@ -150,8 +150,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Decrypt.cpp" />
-    <ClCompile Include="Encrypt.cpp" />
+    <ClCompile Include="Decode.cpp" />
+    <ClCompile Include="Encode.cpp" />
+    <ClCompile Include="Handler.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

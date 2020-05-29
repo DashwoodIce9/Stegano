@@ -6,6 +6,7 @@
 ** Add functionality to support images with FP16/32 channel types
 ** Add support to encode beyond 8x reduction in image sizes
 ** Add option to set preference for size reduction or grayscale conversion if bpch > 12
+** Multithreading
 */
 
 // BPCH = Bits per channel
@@ -24,7 +25,7 @@ constexpr std::array<std::array<unsigned int, 3>, 12> BPCH{{{0, 0, 1},
 
 constexpr std::array<unsigned int, 5> PowersOfTwo{0x1, 0x2, 0x4, 0x8, 0x10};
 
-bool Encrypt(const char* base, const char* source) {
+bool Encode(std::string base, std::string source, std::string OutputFilePath, bool showimages, bool verbose) {
 	cv::Mat BaseImage{cv::imread(base, cv::IMREAD_COLOR)};
 	cv::Mat SourceImage{cv::imread(source, cv::IMREAD_COLOR)};
 	if(!BaseImage.data) {
@@ -37,6 +38,7 @@ bool Encrypt(const char* base, const char* source) {
 					 "color image.\n";
 		return false;
 	}
+	std::cout << "Encoding " << source << " in " << base << "\n\n";
 
 	// Using 7 pixels for the trailer (see definition below)
 	const unsigned int AvailableBasePixels{static_cast<unsigned int>(BaseImage.rows * BaseImage.cols - 7)};
@@ -154,10 +156,10 @@ bool Encrypt(const char* base, const char* source) {
 		}
 	}
 
-	cv::namedWindow("Encrypted Base", cv::WINDOW_AUTOSIZE);
-	cv::imshow("Encrypted Base", BaseImage);
-	cv::imwrite("Encrypted.png", BaseImage);
-
+	cv::imwrite(OutputFilePath, BaseImage);
+	cv::namedWindow("Encoded Base", cv::WINDOW_AUTOSIZE);
+	cv::imshow("Encoded Base", BaseImage);
 	cv::waitKey(0);
+
 	return true;
 }

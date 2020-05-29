@@ -1,42 +1,26 @@
 #include <iostream>
-#include <cstring>
 
-bool Encrypt(const char* base, const char* source);
-bool Decrypt(const char* encrypted);
+int handler(const int& argc, const char* argv[]);
 
 int main(const int argc, const char* argv[]) {
-	bool flag = false;
-	if(argc > 1) {
-		if(!strcmp(argv[1], "D")) {
-			std::cout << "Decrypting " << argv[2] << '\n';
-			if(!Decrypt(argv[2])) {
-				std::cerr << "\nPress any key to abort\n";
-				std::cin.get();
-				return -1;
+	if(int return_code = handler(argc, argv)) {
+		if(return_code == 1) {
+			std::cerr << "Error! Invalid arguments passed!\n\n";
+			std::cout << "To encode, run - \"Stegano.exe encrypt <base> <source>\"\n";
+			std::cout << "To decode, run - \"Stegano.exe decrypt <encoded>\"\n\n";
+			std::cout << "Run - \"Stegano.exe help\" for a full list of commands.\n";
+		}
+		if(argc == 1) {
+			if(return_code != 2 && return_code != 3) {
+				std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 			}
+			std::cerr << "\nPress enter/return to terminate";
+			std::cin.get();
 		}
-		else if(!strcmp(argv[1], "E") && argc == 4) {
-			std::cout << "Encrypting " << argv[3] << " in " << argv[2] << '\n';
-			if(!Encrypt(argv[2], argv[3])) {
-				std::cerr << "\nPress any key to abort\n";
-				std::cin.get();
-				return -1;
-			}
-		}
-		else {
-			flag = true;
-		}
+		std::cout << '\n';
+		return return_code;
 	}
 	else {
-		flag = true;
+		return 0;
 	}
-	if(flag) {
-		std::cerr << "Invalid arguments passed! Correct format is -\n\n";
-		std::cerr << "For Encryption - \"<executable> E <base_image_path> <source_image_path>\"\n";
-		std::cerr << "For Decryption - \"<executable> D <encrypted_image_path>\"\n";
-		std::cerr << "\nPress any key to abort\n";
-		std::cin.get();
-		return 1;
-	}
-	return 0;
 }

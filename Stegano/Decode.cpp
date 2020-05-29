@@ -18,8 +18,15 @@ constexpr std::array<std::array<unsigned int, 3>, 12> BPCH{{{0, 0, 1},
 
 constexpr std::array<unsigned int, 5> PowersOfTwo{0x1, 0x2, 0x4, 0x8, 0x10};
 
-bool Decrypt(const char* encrypted) {
-	cv::Mat BaseImage{cv::imread(encrypted, cv::IMREAD_COLOR)};
+bool Decode(std::string encoded, std::string OutputFilePath, bool showimages, bool verbose) {
+	cv::Mat BaseImage{cv::imread(encoded, cv::IMREAD_COLOR)};
+	if(!BaseImage.data) {
+		std::cerr << "Error! Cannot open base image. Please check if the path is correct and if the file is an 8 bit "
+					 "color image.\n";
+		return false;
+	}
+	std::cout << "Decoding " << encoded << "\n\n";
+
 	const unsigned int AvailableBasePixels{static_cast<unsigned int>(BaseImage.rows * BaseImage.cols - 7)};
 	const unsigned int TotalBaseChannels{AvailableBasePixels * 3U + 21U};
 
@@ -89,9 +96,9 @@ bool Decrypt(const char* encrypted) {
 		}
 	}
 
-	cv::imwrite("Extracted.png", HiddenImage);
-	cv::namedWindow("Extracted", cv::WINDOW_AUTOSIZE);
-	cv::imshow("Extracted", HiddenImage);
+	cv::imwrite(OutputFilePath, HiddenImage);
+	cv::namedWindow("Decoded Image", cv::WINDOW_AUTOSIZE);
+	cv::imshow("Decoded Image", HiddenImage);
 	cv::waitKey(0);
 
 	return true;
