@@ -95,7 +95,26 @@ bool Decode(const std::string& encoded, const std::string& OutputFilePath, const
 		}
 	}
 
-	cv::imwrite(OutputFilePath, HiddenImage);
+	try {
+		cv::imwrite(OutputFilePath, HiddenImage);
+		std::cout << "Image saved at - " << OutputFilePath << '\n';
+	}
+	catch(cv::Exception& e) {
+		if(e.code == -2) {
+			std::cerr << "Error! Cannot save the output file with the given name!\n";
+			std::cout << "If this is a privileged directory, please run this application in elevated mode.\n";
+			std::cout << "Saving as Decoded.png in the working directory";
+			try {
+				cv::imwrite("Decoded.png", HiddenImage);
+				std::cout << "Image saved at - .\\Decoded.png\n";
+			}
+			catch(cv::Exception& E) {
+				if(E.code == -2) {
+					std::cerr << "Error! Cannot save as Decoded.png as well, skipping save step.\n";
+				}
+			}
+		}
+	}
 	cv::namedWindow("Decoded Image", cv::WINDOW_AUTOSIZE);
 	cv::imshow("Decoded Image", HiddenImage);
 	cv::waitKey(0);
