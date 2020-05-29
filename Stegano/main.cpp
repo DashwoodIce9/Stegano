@@ -23,6 +23,7 @@ int main(const int argc, const char* argv[]) {
 		return return_code;
 	}
 	else {
+		std::cout << '\n';
 		return 0;
 	}
 }

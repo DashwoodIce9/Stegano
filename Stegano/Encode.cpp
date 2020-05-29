@@ -27,7 +27,15 @@ constexpr std::array<unsigned int, 5> PowersOfTwo{0x1, 0x2, 0x4, 0x8, 0x10};
 
 bool Encode(const std::string& base, const std::string& source, const std::string& OutputFilePath, const bool& showimages,
 			const bool& verbose) {
+	std::cout << "\t\tImage Steganography Tool (command line mode)\n\n";
+
+	if(verbose) {
+		std::cout << "Reading base image\n";
+	}
 	cv::Mat BaseImage{cv::imread(base, cv::IMREAD_COLOR)};
+	if(verbose) {
+		std::cout << "Reading source image\n";
+	}
 	cv::Mat SourceImage{cv::imread(source, cv::IMREAD_COLOR)};
 	if(!BaseImage.data) {
 		std::cerr << "Error! Cannot open base image. Please check if the path is correct and if the file is an 8 bit "
@@ -39,13 +47,17 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 					 "color image.\n";
 		return false;
 	}
-	std::cout << "Encoding " << source << " in " << base << "\n\n";
 
 	// Using 7 pixels for the trailer (see definition below)
 	const unsigned int AvailableBasePixels{static_cast<unsigned int>(BaseImage.rows * BaseImage.cols - 7)};
 	const unsigned int TotalBaseChannels{AvailableBasePixels * 3U + 21U};
 	unsigned int BitsToEncode{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols * 24)};
 	unsigned int BitsPerPixel{BitsToEncode / AvailableBasePixels}; // zero indexed for BPCH, add 1 to get actual value
+	if(verbose) {
+		std::cout << "Size of base image = " << BaseImage.size() << '\n';
+		std::cout << "Size of source image = " << SourceImage.size() << '\n';
+	}
+
 	if(BitsPerPixel >= 12) {
 		if(BitsPerPixel >= 288) { // Not reducing beyond 8x and grayscale conversion (for now)
 			std::cerr << "Cannot encode without significant loss in visual fidelity. Please choose a larger base image\n";
@@ -57,7 +69,7 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 			cv::resize(SourceImage, SourceImage, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
 		}
 		else if(BitsPerPixel < 36) {
-			std::cout << "Reducing source image to grayscale\n";
+			std::cout << "Converting source image to grayscale\n";
 			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
 		}
 		else if(BitsPerPixel < 48) {
@@ -84,13 +96,22 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 			cv::resize(SourceImage, SourceImage, cv::Size(), 0.125, 0.125, cv::INTER_AREA);
 		}
 		BitsToEncode = SourceImage.rows * SourceImage.cols * 8 * SourceImage.channels();
+		if(verbose) {
+			std::cout << "New size of source image = " << SourceImage.size() << '\n';
+		}
 		BitsPerPixel = BitsToEncode / AvailableBasePixels;
 	}
 
-	cv::namedWindow("Base", cv::WINDOW_AUTOSIZE);
-	cv::namedWindow("Source", cv::WINDOW_AUTOSIZE);
-	cv::imshow("Source", SourceImage);
-	cv::imshow("Base", BaseImage);
+	if(showimages) {
+		cv::namedWindow("Base", cv::WINDOW_AUTOSIZE);
+		cv::namedWindow("Source", cv::WINDOW_AUTOSIZE);
+		cv::imshow("Source", SourceImage);
+		cv::imshow("Base", BaseImage);
+	}
+
+	if(verbose) {
+		std::cout << "Encoding now...\n";
+	}
 
 	// const unsigned int RequiredPixels = BitsToEncode / (BitsPerPixel + 1U);
 	// Stride between each hiding pixel. Stride = (AvailableBasePixels / RequiredPixels) - 1
@@ -157,6 +178,11 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 		}
 	}
 
+	if(verbose) {
+		std::cout << "Finished encoding\n";
+		std::cout << "Saving encoded image\n";
+	}
+
 	try {
 		cv::imwrite(OutputFilePath, BaseImage);
 		std::cout << "Image saved at - " << OutputFilePath << '\n';
@@ -177,9 +203,12 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 			}
 		}
 	}
-	cv::namedWindow("Encoded Base", cv::WINDOW_AUTOSIZE);
-	cv::imshow("Encoded Base", BaseImage);
-	cv::waitKey(0);
+
+	if(showimages) {
+		cv::namedWindow("Encoded Base", cv::WINDOW_AUTOSIZE);
+		cv::imshow("Encoded Base", BaseImage);
+		cv::waitKey(0);
+	}
 
 	return true;
 }

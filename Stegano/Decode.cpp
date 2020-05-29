@@ -18,13 +18,20 @@ constexpr std::array<std::array<unsigned int, 3>, 12> BPCH{{{0, 0, 1},
 constexpr std::array<unsigned int, 5> PowersOfTwo{0x1, 0x2, 0x4, 0x8, 0x10};
 
 bool Decode(const std::string& encoded, const std::string& OutputFilePath, const bool& showimages, const bool& verbose) {
+	std::cout << "\t\tImage Steganography Tool (command line mode)\n\n";
+
+	if(verbose) {
+		std::cout << "Reading encoded image\n";
+	}
 	cv::Mat BaseImage{cv::imread(encoded, cv::IMREAD_COLOR)};
 	if(!BaseImage.data) {
 		std::cerr << "Error! Cannot open base image. Please check if the path is correct and if the file is an 8 bit "
 					 "color image.\n";
 		return false;
 	}
-	std::cout << "Decoding " << encoded << "\n\n";
+	if(verbose) {
+		std::cout << "Encoded image size = " << BaseImage.size() << '\n';
+	}
 
 	const unsigned int AvailableBasePixels{static_cast<unsigned int>(BaseImage.rows * BaseImage.cols - 7)};
 	const unsigned int TotalBaseChannels{AvailableBasePixels * 3U + 21U};
@@ -46,28 +53,32 @@ bool Decode(const std::string& encoded, const std::string& OutputFilePath, const
 		return false;
 	}
 
-	unsigned int HiddenImageRows{trailer[0]}, HiddenImageColumns{trailer[2]};
-	HiddenImageRows <<= 8;
-	HiddenImageRows += trailer[1];
-	bool HiddenImageGrayscale = false;
-	if(HiddenImageColumns >= 0x80U) {
-		HiddenImageColumns -= 0x80U;
-		HiddenImageGrayscale = true;
+	if(verbose) {
+		std::cout << "Encoded image found, decoding...\n";
 	}
-	HiddenImageColumns <<= 8;
-	HiddenImageColumns += trailer[3];
 
-	cv::Mat HiddenImage{cv::Mat::zeros(HiddenImageRows, HiddenImageColumns, HiddenImageGrayscale ? CV_8UC1 : CV_8UC3)};
+	unsigned int EncodedImageRows{trailer[0]}, EncodedImageColumns{trailer[2]};
+	EncodedImageRows <<= 8;
+	EncodedImageRows += trailer[1];
+	bool EncodedImageGrayscale = false;
+	if(EncodedImageColumns >= 0x80U) {
+		EncodedImageColumns -= 0x80U;
+		EncodedImageGrayscale = true;
+	}
+	EncodedImageColumns <<= 8;
+	EncodedImageColumns += trailer[3];
 
-	const unsigned int TotalHiddenImageChannels{HiddenImageRows * HiddenImageColumns * (HiddenImageGrayscale ? 1U : 3U)};
-	const unsigned int BitsEncoded{TotalHiddenImageChannels * 8U};
+	cv::Mat EncodedImage{cv::Mat::zeros(EncodedImageRows, EncodedImageColumns, EncodedImageGrayscale ? CV_8UC1 : CV_8UC3)};
+
+	const unsigned int TotalEncodedImageChannels{EncodedImageRows * EncodedImageColumns * (EncodedImageGrayscale ? 1U : 3U)};
+	const unsigned int BitsEncoded{TotalEncodedImageChannels * 8U};
 	const unsigned int BitsPerPixel{BitsEncoded / AvailableBasePixels};
 	const std::array<unsigned int, 3> bpch{BPCH[BitsPerPixel]};
 	const unsigned int stride{(AvailableBasePixels * (BitsPerPixel + 1U) / BitsEncoded) - 1U};
-	unsigned char *const HiddenImageData{HiddenImage.data}, *const BaseImageData{BaseImage.data};
+	unsigned char *const EncodedImageData{EncodedImage.data}, *const BaseImageData{BaseImage.data};
 
-	// Extracting hidden bits
-	for(unsigned int i{0}, j{0}, BGR{0}, TransferredBits{0}; i < TotalHiddenImageChannels; ++BGR, ++j) {
+	// Extracting Encoded bits
+	for(unsigned int i{0}, j{0}, BGR{0}, TransferredBits{0}; i < TotalEncodedImageChannels; ++BGR, ++j) {
 		if(BGR == 3U) {
 			BGR = 0U;
 			j += stride * 3U;
@@ -77,15 +88,15 @@ bool Decode(const std::string& encoded, const std::string& OutputFilePath, const
 			if(TransferredBits + ChannelBits > 8U) {
 				unsigned int NextChannelBits{ChannelBits + TransferredBits};
 				NextChannelBits -= 8U;
-				HiddenImageData[i] <<= (8U - TransferredBits);
-				HiddenImageData[i] += (BaseImageData[j] >> NextChannelBits) % PowersOfTwo[8U - TransferredBits];
+				EncodedImageData[i] <<= (8U - TransferredBits);
+				EncodedImageData[i] += (BaseImageData[j] >> NextChannelBits) % PowersOfTwo[8U - TransferredBits];
 				++i;
-				HiddenImageData[i] += BaseImageData[j] % PowersOfTwo[NextChannelBits];
+				EncodedImageData[i] += BaseImageData[j] % PowersOfTwo[NextChannelBits];
 				TransferredBits = NextChannelBits;
 			}
 			else {
-				HiddenImageData[i] <<= ChannelBits;
-				HiddenImageData[i] += BaseImageData[j] % PowersOfTwo[ChannelBits];
+				EncodedImageData[i] <<= ChannelBits;
+				EncodedImageData[i] += BaseImageData[j] % PowersOfTwo[ChannelBits];
 				TransferredBits += ChannelBits;
 				if(TransferredBits == 8U) {
 					TransferredBits = 0U;
@@ -95,8 +106,13 @@ bool Decode(const std::string& encoded, const std::string& OutputFilePath, const
 		}
 	}
 
+	if(verbose) {
+		std::cout << "Finished decoding\n";
+		std::cout << "Saving decoded image\n";
+	}
+
 	try {
-		cv::imwrite(OutputFilePath, HiddenImage);
+		cv::imwrite(OutputFilePath, EncodedImage);
 		std::cout << "Image saved at - " << OutputFilePath << '\n';
 	}
 	catch(cv::Exception& e) {
@@ -105,7 +121,7 @@ bool Decode(const std::string& encoded, const std::string& OutputFilePath, const
 			std::cout << "If this is a privileged directory, please run this application in elevated mode.\n";
 			std::cout << "Saving as Decoded.png in the working directory";
 			try {
-				cv::imwrite("Decoded.png", HiddenImage);
+				cv::imwrite("Decoded.png", EncodedImage);
 				std::cout << "Image saved at - .\\Decoded.png\n";
 			}
 			catch(cv::Exception& E) {
@@ -115,9 +131,12 @@ bool Decode(const std::string& encoded, const std::string& OutputFilePath, const
 			}
 		}
 	}
-	cv::namedWindow("Decoded Image", cv::WINDOW_AUTOSIZE);
-	cv::imshow("Decoded Image", HiddenImage);
-	cv::waitKey(0);
+
+	if(showimages) {
+		cv::namedWindow("Decoded Image", cv::WINDOW_AUTOSIZE);
+		cv::imshow("Decoded Image", EncodedImage);
+		cv::waitKey(0);
+	}
 
 	return true;
 }
