@@ -6,8 +6,9 @@ static bool output{false}, verbose{false}, multithreading{false}, showimages{fal
 static std::string OutputFilePath{"Encoded.png"};
 static unsigned int threads{0};
 
-bool Encode(std::string& base, std::string& source, std::string& OutputFilePath, bool& showimages, bool& verbose);
-bool Decode(std::string& encoded, std::string& OutputFilePath, bool& showimages, bool& verbose);
+bool Encode(const std::string& base, const std::string& source, const std::string& OutputFilePath, const bool& showimages,
+			const bool& verbose);
+bool Decode(const std::string& encoded, const std::string& OutputFilePath, const bool& showimages, const bool& verbose);
 
 static void help() {
 	std::cout << "------------------------------------------------------ Help "
@@ -48,6 +49,10 @@ static bool LoopThroughArgs(int start, const int& argc, const char* argv[]) {
 		else if(!multithreading && (!strcmp(argv[i], "/t") || !strcmp(argv[i], "/T") || !strcmp(argv[i], "threads"))) {
 			multithreading = true;
 			threads = static_cast<unsigned int>(atoi(argv[i + 1]));
+			if(threads == 0 || threads > 512) {
+				std::cout << "\nImproper value for threads passed, defaulting to single threaded operation.\n";
+				multithreading = false;
+			}
 			++i;
 		}
 		else {
@@ -65,7 +70,7 @@ int handler(const int& argc, const char* argv[]) {
 			help();
 			return 0;
 		}
-		else if(argc > 2) {
+		if(argc > 2) {
 			if(!strcmp(argv[1], "/D") || !strcmp(argv[1], "/d") || !strcmp(argv[1], "decode")) {
 				decode = true;
 				Base = argv[2];
