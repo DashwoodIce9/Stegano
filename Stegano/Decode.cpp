@@ -28,7 +28,7 @@ bool Decode(const std::string& source, const std::string& OutputFilePath) {
 			done = 0U;
 			++i;
 		}
-		trailer[i] <<= 2;
+		trailer[i] *= PowersOfTwo[2];
 		trailer[i] += static_cast<unsigned char>(SourceImage.data[TotalBaseChannels - ch] % 4U);
 	}
 
@@ -43,14 +43,14 @@ bool Decode(const std::string& source, const std::string& OutputFilePath) {
 	}
 
 	unsigned int DecodedImageRows{trailer[0]}, DecodedImageColumns{trailer[2]};
-	DecodedImageRows <<= 8;
+	DecodedImageRows *= PowersOfTwo[8];
 	DecodedImageRows += trailer[1];
 	bool DecodedImageGrayscale = false;
-	if(DecodedImageColumns >= 0x80U) {
-		DecodedImageColumns -= 0x80U;
+	if(DecodedImageColumns >= PowersOfTwo[7]) {
+		DecodedImageColumns -= PowersOfTwo[7];
 		DecodedImageGrayscale = true;
 	}
-	DecodedImageColumns <<= 8;
+	DecodedImageColumns *= PowersOfTwo[8];
 	DecodedImageColumns += trailer[3];
 
 	cv::Mat DecodedImage{cv::Mat::zeros(static_cast<int>(DecodedImageRows), static_cast<int>(DecodedImageColumns),
@@ -74,14 +74,14 @@ bool Decode(const std::string& source, const std::string& OutputFilePath) {
 			if(TransferredBits + ChannelBits > 8U) {
 				unsigned int NextChannelBits{ChannelBits + TransferredBits};
 				NextChannelBits -= 8U;
-				DecodedImageData[i] <<= (8U - TransferredBits);
-				DecodedImageData[i] += (SourceImageData[j] >> NextChannelBits) % PowersOfTwo[8U - TransferredBits];
+				DecodedImageData[i] *= PowersOfTwo[8U - TransferredBits];
+				DecodedImageData[i] += (SourceImageData[j] / PowersOfTwo[NextChannelBits]) % PowersOfTwo[8U - TransferredBits];
 				++i;
 				DecodedImageData[i] += SourceImageData[j] % PowersOfTwo[NextChannelBits];
 				TransferredBits = NextChannelBits;
 			}
 			else {
-				DecodedImageData[i] <<= ChannelBits;
+				DecodedImageData[i] *= PowersOfTwo[ChannelBits];
 				DecodedImageData[i] += SourceImageData[j] % PowersOfTwo[ChannelBits];
 				TransferredBits += ChannelBits;
 				if(TransferredBits == 8U) {

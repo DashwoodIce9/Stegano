@@ -17,7 +17,7 @@ constexpr std::array<std::array<unsigned int, 3>, 12> BPCH{{{0, 0, 1},
 															{4, 3, 4},
 															{4, 4, 4}}};
 
-constexpr std::array<unsigned int, 5> PowersOfTwo{0x1, 0x2, 0x4, 0x8, 0x10};
+constexpr std::array<unsigned int, 9> PowersOfTwo{0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80, 0x100};
 
 extern bool verbose, showimages;
 

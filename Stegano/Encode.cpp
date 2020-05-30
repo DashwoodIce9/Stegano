@@ -151,11 +151,11 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	** Next 8 bits = checksum (see below)
 	*/
 	std::array<unsigned char, 5> trailer{0, 0, 0, 0, 0};
-	trailer[0] = static_cast<unsigned char>((SourceImage.rows >> 8) % 0x100); // bits 0-7
-	trailer[1] = static_cast<unsigned char>(SourceImage.rows % 0x100);		  // bits 8-15
-	// bits 16-23
-	trailer[2] = static_cast<unsigned char>((SourceImage.channels() == 1 ? 0x80 : 0) + ((SourceImage.cols >> 8) % 0x80));
-	trailer[3] = static_cast<unsigned char>(SourceImage.cols % 0x100); // bits 24-31
+	trailer[0] = static_cast<unsigned char>((SourceImage.rows / PowersOfTwo[8]) % PowersOfTwo[8]); // bits 0-7
+	trailer[1] = static_cast<unsigned char>(SourceImage.rows % PowersOfTwo[8]);					   // bits 8-15
+	trailer[2] = static_cast<unsigned char>((SourceImage.channels() == 1 ? PowersOfTwo[7] : 0)
+											+ ((SourceImage.cols / PowersOfTwo[8]) % PowersOfTwo[7])); // bits 16-23
+	trailer[3] = static_cast<unsigned char>(SourceImage.cols % PowersOfTwo[8]);						   // bits 24-31
 
 	/* Checksum config
 	** Checksum is the last channel of 2nd pixel used by the trailer
@@ -170,8 +170,9 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 			done = 0U;
 			++i;
 		}
-		BaseImage.data[TotalBaseChannels - ch] -= BaseImage.data[TotalBaseChannels - ch] % 4;
-		BaseImage.data[TotalBaseChannels - ch] += static_cast<unsigned char>((trailer[i] >> (6U - done)) % 4U);
+		BaseImage.data[TotalBaseChannels - ch] -= BaseImage.data[TotalBaseChannels - ch] % PowersOfTwo[2];
+		BaseImage.data[TotalBaseChannels - ch]
+			+= static_cast<unsigned char>((trailer[i] / PowersOfTwo[6U - done]) % PowersOfTwo[2]);
 	}
 
 	const std::array<unsigned int, 3> bpch{BPCH[BitsPerPixel]};
@@ -189,13 +190,14 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 			if(TransferredBits + ChannelBits > 8U) {
 				unsigned int NextChannelBits{ChannelBits + TransferredBits};
 				NextChannelBits -= 8U;
-				BaseImageData[i] += ((SourceImageData[j] % PowersOfTwo[8U - TransferredBits]) << NextChannelBits);
+				BaseImageData[i] += ((SourceImageData[j] % PowersOfTwo[8U - TransferredBits]) * PowersOfTwo[NextChannelBits]);
 				++j;
-				BaseImageData[i] += (SourceImageData[j] >> (8U - NextChannelBits)) % PowersOfTwo[NextChannelBits];
+				BaseImageData[i] += (SourceImageData[j] / PowersOfTwo[8U - NextChannelBits]) % PowersOfTwo[NextChannelBits];
 				TransferredBits = NextChannelBits;
 			}
 			else {
-				BaseImageData[i] += (SourceImageData[j] >> (8U - ChannelBits - TransferredBits)) % PowersOfTwo[ChannelBits];
+				BaseImageData[i]
+					+= (SourceImageData[j] / PowersOfTwo[(8U - ChannelBits) - TransferredBits]) % PowersOfTwo[ChannelBits];
 				TransferredBits += ChannelBits;
 				if(TransferredBits == 8U) {
 					TransferredBits = 0U;
