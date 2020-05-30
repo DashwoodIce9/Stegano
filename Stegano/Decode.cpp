@@ -98,7 +98,9 @@ bool Decode(const std::string& source, const std::string& OutputFilePath) {
 	}
 
 	try {
-		cv::imwrite(OutputFilePath, DecodedImage);
+		cv::imwrite(
+			OutputFilePath, DecodedImage,
+			std::vector<int>{cv::IMWRITE_PNG_COMPRESSION, 4, cv::IMWRITE_PNG_STRATEGY, cv::IMWRITE_PNG_STRATEGY_FILTERED});
 		std::cout << "Image saved at - " << OutputFilePath << "\n\n";
 	}
 	catch(cv::Exception& e) {

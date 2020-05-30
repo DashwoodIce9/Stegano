@@ -213,7 +213,9 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	}
 
 	try {
-		cv::imwrite(OutputFilePath, BaseImage);
+		cv::imwrite(
+			OutputFilePath, BaseImage,
+			std::vector<int>{cv::IMWRITE_PNG_COMPRESSION, 4, cv::IMWRITE_PNG_STRATEGY, cv::IMWRITE_PNG_STRATEGY_FILTERED});
 		std::cout << "Image saved at - " << OutputFilePath << "\n";
 	}
 	catch(cv::Exception& e) {
