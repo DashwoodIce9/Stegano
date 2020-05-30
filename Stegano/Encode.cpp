@@ -1,34 +1,52 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
-#include <array>
+#include "SteganoCommon.h"
 
 /* TODO
 ** Add functionality to support images with FP16/32 channel types
 ** Add support to encode beyond 8x reduction in image sizes
 ** Add option to set preference for size reduction or grayscale conversion if bpch > 12
 ** Multithreading
+** Add option for no reduction
+** Add option for force encoding, i.e. encode even if base is not large enough. Portion of source will not be encoded
+** Add option for converting source/base to grayscale and to enlarge or shrink them by given factors
 */
 
-// BPCH = Bits per channel
-constexpr std::array<std::array<unsigned int, 3>, 12> BPCH{{{0, 0, 1},
-															{1, 0, 1},
-															{1, 1, 1},
-															{1, 1, 2},
-															{2, 1, 2},
-															{2, 2, 2},
-															{2, 2, 3},
-															{3, 2, 3},
-															{3, 3, 3},
-															{3, 3, 4},
-															{4, 3, 4},
-															{4, 4, 4}}};
+namespace Stegano {
+#if _WIN32
+void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name) {
+	const double hRatio{static_cast<double>(DesktopWidth) / static_cast<double>(input.cols)};
+	const double vRatio{static_cast<double>(DesktopHeight) / static_cast<double>(input.rows)};
+	std::streamsize defaultprecision{std::cout.precision()};
+	std::cout.precision(3);
+	if(hRatio < 1.0) {
+		if(verbose) {
+			std::cout << name << " too large to display, constrained ";
+		}
+		if(hRatio < vRatio) {
+			if(verbose) {
+				std::cout << "horizontally. Shrinking by a factor of " << hRatio << '\n';
+			}
+			cv::resize(input, output, cv::Size(), hRatio, hRatio, cv::INTER_AREA);
+		}
+		else {
+			if(verbose) {
+				std::cout << "vertically. Shrinking by a factor of " << vRatio << '\n';
+			}
+			cv::resize(input, output, cv::Size(), vRatio, vRatio, cv::INTER_AREA);
+		}
+	}
+	else if(vRatio < 1.0) {
+		if(verbose) {
+			std::cout << name << " too large to display, constrained vertically. Shrinking by a factor of " << vRatio << '\n';
+		}
+		cv::resize(input, output, cv::Size(), vRatio, vRatio, cv::INTER_AREA);
+	}
+	std::cout.precision(defaultprecision);
+}
+#endif
 
-constexpr std::array<unsigned int, 5> PowersOfTwo{0x1, 0x2, 0x4, 0x8, 0x10};
-
-bool Encode(const std::string& base, const std::string& source, const std::string& OutputFilePath, const bool& showimages,
-			const bool& verbose) {
-	std::cout << "\t\tImage Steganography Tool (command line mode)\n\n";
-
+bool Encode(const std::string& base, const std::string& source, const std::string& OutputFilePath) {
 	if(verbose) {
 		std::cout << "Reading base image\n";
 	}
@@ -54,8 +72,10 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	unsigned int BitsToEncode{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols * 24)};
 	unsigned int BitsPerPixel{BitsToEncode / AvailableBasePixels}; // zero indexed for BPCH, add 1 to get actual value
 	if(verbose) {
-		std::cout << "Size of base image = " << BaseImage.size() << '\n';
-		std::cout << "Size of source image = " << SourceImage.size() << '\n';
+		std::cout << "Base image size = [" << BaseImage.rows << " x " << BaseImage.cols << " x " << BaseImage.channels() << ']'
+				  << '\n';
+		std::cout << "Source image size = [" << SourceImage.rows << " x " << SourceImage.cols << " x " << SourceImage.channels()
+				  << ']' << "\n\n";
 	}
 
 	if(BitsPerPixel >= 12) {
@@ -97,16 +117,22 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 		}
 		BitsToEncode = SourceImage.rows * SourceImage.cols * 8 * SourceImage.channels();
 		if(verbose) {
-			std::cout << "New size of source image = " << SourceImage.size() << '\n';
+			std::cout << "Modified source image size = [" << SourceImage.rows << " x " << SourceImage.cols << " x "
+					  << SourceImage.channels() << ']' << "\n\n";
 		}
 		BitsPerPixel = BitsToEncode / AvailableBasePixels;
 	}
 
 	if(showimages) {
+		cv::Mat BaseCopy{BaseImage}, SourceCopy{SourceImage};
+#if _WIN32
+		ResizeToSmall(BaseImage, BaseCopy, "Base Image");
+		ResizeToSmall(SourceImage, SourceCopy, "Source Image");
+#endif
 		cv::namedWindow("Base", cv::WINDOW_AUTOSIZE);
 		cv::namedWindow("Source", cv::WINDOW_AUTOSIZE);
-		cv::imshow("Source", SourceImage);
-		cv::imshow("Base", BaseImage);
+		cv::imshow("Source", SourceCopy);
+		cv::imshow("Base", BaseCopy);
 	}
 
 	if(verbose) {
@@ -125,10 +151,11 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	** Next 8 bits = checksum (see below)
 	*/
 	std::array<unsigned char, 5> trailer{0, 0, 0, 0, 0};
-	trailer[0] = (SourceImage.rows >> 8U) % 0x100U;												  // bits 0-7
-	trailer[1] = SourceImage.rows % 0x100U;														  // bits 8-15
-	trailer[2] = (SourceImage.channels() == 1 ? 0x80U : 0U) + ((SourceImage.cols >> 8U) % 0x80U); // bits 16-23
-	trailer[3] = SourceImage.cols % 0x100U;														  // bits 24-31
+	trailer[0] = static_cast<unsigned char>((SourceImage.rows >> 8) % 0x100); // bits 0-7
+	trailer[1] = static_cast<unsigned char>(SourceImage.rows % 0x100);		  // bits 8-15
+	// bits 16-23
+	trailer[2] = static_cast<unsigned char>((SourceImage.channels() == 1 ? 0x80 : 0) + ((SourceImage.cols >> 8) % 0x80));
+	trailer[3] = static_cast<unsigned char>(SourceImage.cols % 0x100); // bits 24-31
 
 	/* Checksum config
 	** Checksum is the last channel of 2nd pixel used by the trailer
@@ -185,7 +212,7 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 
 	try {
 		cv::imwrite(OutputFilePath, BaseImage);
-		std::cout << "Image saved at - " << OutputFilePath << '\n';
+		std::cout << "Image saved at - " << OutputFilePath << "\n";
 	}
 	catch(cv::Exception& e) {
 		if(e.code == -2) {
@@ -194,21 +221,25 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 			std::cout << "Saving as Encoded.png in the working directory";
 			try {
 				cv::imwrite("Encoded.png", BaseImage);
-				std::cout << "Image saved at - .\\Encoded.png\n";
+				std::cout << "Image saved at - .\\Encoded.png\n\n";
 			}
 			catch(cv::Exception& E) {
 				if(E.code == -2) {
-					std::cerr << "Error! Cannot save as Encoded.png as well, skipping save step.\n";
+					std::cerr << "Error! Cannot save as Encoded.png as well, skipping save step.\n\n";
 				}
 			}
 		}
 	}
 
 	if(showimages) {
+#if _WIN32
+		ResizeToSmall(BaseImage, BaseImage, "Encoded Image");
+#endif
 		cv::namedWindow("Encoded Base", cv::WINDOW_AUTOSIZE);
 		cv::imshow("Encoded Base", BaseImage);
 		cv::waitKey(0);
 	}
 
 	return true;
+}
 }
