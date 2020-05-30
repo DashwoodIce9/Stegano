@@ -24,26 +24,35 @@ void hold() {
 }
 
 static void help() {
-	std::cout << "------------------------------------------------------ Help "
+	std::cout << "\n------------------------------------------------------ Help "
 				 "------------------------------------------------------\n\n";
 	std::cout << "NAME\n\tImage Steganography Tool\n\n";
-	std::cout << "SYNTAX\n\tStegano.exe {{help | /h | /H} | {{encode | /e | /E} <base> <source>} | {{decode | /d | /D}"
-				 "<source>}}\n\t{{output | /o | /O} <path>} {verbose | /v | /V} {show | /s | /S} {{threads | /t | /T} "
-				 "1...512}\n\n";
+	std::cout << "SYNTAX\n\tStegano.exe {help | /h | /H} | {[{encode | /e | /E} <base> <source>] | [{decode | /d | /D} "
+				 "<source>]}\n\t[{output | /o | /O} <path>] {verbose | /v | /V} {show | /s | /S} [{threads | /t | /T} "
+				 "1...512]\n\t{base | /b | /B} {force | /f | /F} {noreduc | /nr | /NR} {gray | /g | /G}\n\n";
 	std::cout << "DESCRIPTION\n\tSteganography is the practice of concealing messages or information within other"
 				 "non-secret text or data.\n\tThis application hides images within images.\n\n\t";
-	std::cout << "help (optional) - Display the help text and terminate.\n\n\t";
-	std::cout << "encode - Hides source file inside base.\n\t\te.g. - Stegano.exe ..\\Base.png ..\\Source.png\n\n\t";
-	std::cout << "decode - Decodes the data embedded in source file (must be a losslessly encoded file like .png or .tif).\n\t\t"
+	std::cout << "---------------------------------------------- Commands ----------------------------------------------\n\n\t";
+	std::cout << "a) help (optional) - Display the help text and terminate.\n\n\t";
+	std::cout << "b) encode - Hides source file inside base.\n\t\te.g. - Stegano.exe ..\\Base.png ..\\Source.png\n\n\t";
+	std::cout << "c) decode - Decodes the data embedded in source file (must be a losslessly encoded file).\n\t\t"
 				 "e.g. - Stegano.exe ..\\Encoded.png\n\n\t";
-	std::cout << "output (optional, default = Encoded.png) - Sets the output image path. Must end with .png extension.\n\t\t"
+	std::cout << "------------------------------------------------ Flags -----------------------------------------------\n\n\t";
+	std::cout << "1) output (optional, default = Encoded.png) - Sets the output image path. Must end with .png extension.\n\t\t"
 				 "If the directory requires privileged access, the application must be run with elevated permissions.\n\t\t"
 				 "e.g. - Stegano.exe encrypt ..\\Base.png ..\\Source.png output ..\\Output.png\n\n\t";
-	std::cout << "verbose (optional) - Turns on verbose mode\n\n\t";
-	std::cout << "show (optional) - Display the source image(s) and the output image.\n\n\t";
-	std::cout << "threads (optional, default = 1) - Enable multithreaded operation with the specified number of threads.\n\t\t"
-				 "e.g. - Stegano.exe decode ..\\Encoded.png threads 8\n\n";
-	std::cout << "AUTHOR\n\tDashwoodIce9\n\n";
+	std::cout << "2) verbose (optional) - Turns on verbose mode\n\n\t";
+	std::cout << "3) show (optional) - Display the source image(s) and the output image.\n\n\t";
+	std::cout << "4) threads (optional, default = 1) - Enable multithreaded operation with the specified number of threads.\n\t\t"
+				 "e.g. - Stegano.exe decode ..\\Encoded.png threads 8\n\n\t";
+	std::cout << "5) base (optional) - Apply expanding transformation on base if it is not large enough to store the source."
+				 "\n\t\tThe source is not shrunk.\n\n\t";
+	std::cout << "6) noreduc (optional) - No Reduction. Disables reduction of source or expansion of base to encode.\n\t\t"
+				 "If turned on, \"base\" option will have no effect. If base is not large enough, throws error.\n\n\t";
+	std::cout << "7) force (optional) - Encode even if the base cannot store the source completely. A portion of source\n\t\t"
+				 "will be lost in this process. Implicity turns on the \"noreduc\" flag.\n\n\t";
+	std::cout << "8) gray (optional) - Prefer conversion to grayscale than dimension shrinking during reduction process.\n\n";
+	std::cout << "AUTHOR\n\tDashwoodIce9\n";
 }
 
 static bool LoopThroughArgs(const int start, const int& argc, const char** argv, std::string* OutputFilePath,
@@ -83,11 +92,11 @@ int handler(const int& argc, const char** argv) {
 	std::string Base, Source, OutputFilePath{"Encoded.png"};
 
 	if(argc > 1) {
-		std::cout << "\n\t\tImage Steganography Tool (command line mode)\n\n";
 		if(std::string(argv[1]) == "/h" || std::string(argv[1]) == "/H" || std::string(argv[1]) == "help") {
 			help();
 			return 0;
 		}
+		std::cout << "\n\t\tImage Steganography Tool (command line mode)\n\n";
 		if(argc > 2) {
 			if(std::string(argv[1]) == "/D" || std::string(argv[1]) == "/d" || std::string(argv[1]) == "decode") {
 				decode = true;
