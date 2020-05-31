@@ -32,5 +32,8 @@
     <ClInclude Include="SteganoCommon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SteganoLogger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

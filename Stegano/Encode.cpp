@@ -1,5 +1,5 @@
 #include <opencv2/opencv.hpp>
-#include <iostream>
+#include "SteganoLogger.h"
 #include "SteganoCommon.h"
 
 /* TODO
@@ -7,12 +7,15 @@
 ** Add support to encode beyond 8x reduction in image sizes
 ** Add option to set preference for size reduction or grayscale conversion if bpch > 12
 ** Multithreading
-** Add option for no reduction
-** Add option for force encoding, i.e. encode even if base is not large enough. Portion of source will not be encoded
-** Add option for converting source/base to grayscale and to enlarge or shrink them by given factors
+** Add support for no reduction
+** Add support for force encoding, i.e. encode even if base is not large enough. Portion of source will not be encoded
+** Add support for converting source/base to grayscale and to enlarge or shrink them by given factors
 */
 
 namespace Stegano {
+
+extern bool base, force, noreduc, grayscale;
+
 #if _WIN32
 void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name) {
 	const double hRatio{static_cast<double>(DesktopWidth) / static_cast<double>(input.cols)};
@@ -20,26 +23,18 @@ void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& nam
 	std::streamsize defaultprecision{std::cout.precision()};
 	std::cout.precision(3);
 	if(hRatio < 1.0) {
-		if(verbose) {
-			std::cout << name << " too large to display, constrained ";
-		}
+		Stegano::Logger::Verbose(name, " too large to display, constrained ");
 		if(hRatio < vRatio) {
-			if(verbose) {
-				std::cout << "horizontally. Shrinking by a factor of " << hRatio << '\n';
-			}
+			Stegano::Logger::Verbose("horizontally. Shrinking by a factor of ", hRatio, '\n');
 			cv::resize(input, output, cv::Size(), hRatio, hRatio, cv::INTER_AREA);
 		}
 		else {
-			if(verbose) {
-				std::cout << "vertically. Shrinking by a factor of " << vRatio << '\n';
-			}
+			Stegano::Logger::Verbose("vertically. Shrinking by a factor of ", vRatio, '\n');
 			cv::resize(input, output, cv::Size(), vRatio, vRatio, cv::INTER_AREA);
 		}
 	}
 	else if(vRatio < 1.0) {
-		if(verbose) {
-			std::cout << name << " too large to display, constrained vertically. Shrinking by a factor of " << vRatio << '\n';
-		}
+		Stegano::Logger::Verbose(name, " too large to display, constrained ", "vertically. Shrinking by a factor of ", vRatio, '\n');
 		cv::resize(input, output, cv::Size(), vRatio, vRatio, cv::INTER_AREA);
 	}
 	std::cout.precision(defaultprecision);
@@ -47,22 +42,28 @@ void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& nam
 #endif
 
 bool Encode(const std::string& base, const std::string& source, const std::string& OutputFilePath) {
-	if(verbose) {
-		std::cout << "Reading base image\n";
-	}
+	Stegano::Logger::Verbose("Reading base image", '\n');
 	cv::Mat BaseImage{cv::imread(base, cv::IMREAD_COLOR)};
-	if(verbose) {
-		std::cout << "Reading source image\n";
-	}
+	Stegano::Logger::Verbose("Reading source image", '\n');
 	cv::Mat SourceImage{cv::imread(source, cv::IMREAD_COLOR)};
 	if(!BaseImage.data) {
-		std::cerr << "Error! Cannot open base image. Please check if the path is correct and if the file is an 8 bit "
-					 "color image.\n";
+		Stegano::Logger::Error("Error!", " Cannot open base image.",
+							   " Please check if the path is correct and if the file is an 8 bit color image.", '\n');
 		return false;
 	}
 	if(!SourceImage.data) {
-		std::cerr << "Error! Cannot open source image. Please check if the path is correct and if the file is an 8 bit "
-					 "color image.\n";
+		Stegano::Logger::Error("Error!", " Cannot open source image.",
+							   " Please check if the path is correct and if the file is an 8 bit color image.", '\n');
+		return false;
+	}
+	if(BaseImage.rows > 65535 || BaseImage.cols > 65535) {
+		Stegano::Logger::Error("Error!", " Base image too large.",
+							   " Cannot operate on images with dimensions greater than [65536 x 65536].\n");
+		return false;
+	}
+	if(SourceImage.rows > 65535 || SourceImage.cols > 65535) {
+		Stegano::Logger::Error("Error!", " Source image too large.",
+							   " Cannot operate on images with dimensions greater than [65536 x 65536].", '\n');
 		return false;
 	}
 
@@ -71,55 +72,58 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	const unsigned int TotalBaseChannels{AvailableBasePixels * 3U + 21U};
 	unsigned int BitsToEncode{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols * 24)};
 	unsigned int BitsPerPixel{BitsToEncode / AvailableBasePixels}; // zero indexed for BPCH, add 1 to get actual value
-	if(verbose) {
-		std::cout << "Base image size = [" << BaseImage.rows << " x " << BaseImage.cols << " x " << BaseImage.channels() << ']'
-				  << '\n';
-		std::cout << "Source image size = [" << SourceImage.rows << " x " << SourceImage.cols << " x " << SourceImage.channels()
-				  << ']' << "\n\n";
-	}
+
+	Stegano::Logger::Verbose("Base image size = [", BaseImage.rows, " x ", BaseImage.cols, " x ", BaseImage.channels(), ']', '\n',
+							 "Source image size = [", SourceImage.rows, " x ", SourceImage.cols, " x ", SourceImage.channels(), ']',
+							 "\n\n");
 
 	if(BitsPerPixel >= 12) {
-		if(BitsPerPixel >= 288) { // Not reducing beyond 8x and grayscale conversion (for now)
-			std::cerr << "Cannot encode without significant loss in visual fidelity. Please choose a larger base image\n";
+		if(noreduc && !force) {
+			Stegano::Logger::Error("Error!", " Image reduction is disabled and base image is not large enough to store the source image",
+								   '\n');
+			Stegano::Logger::Log("Rerun without \"noreduc\" flag or choose a larger base image", '\n');
 			return false;
 		}
-		std::cout << "Base image not large enough, reducing source image\n";
+		if(BitsPerPixel >= 288) { // Not reducing beyond 8x and grayscale conversion (for now)
+			Stegano::Logger::Error("Cannot encode without significant loss in visual fidelity.", " Please choose a larger base image",
+								   '\n');
+			return false;
+		}
+		Stegano::Logger::Log("Base image not large enough, reducing source image", '\n');
 		if(BitsPerPixel < 24) {
-			std::cout << "Reducing source image area by 2\n";
+			Stegano::Logger::Log("Reducing source image area by 2", '\n');
 			cv::resize(SourceImage, SourceImage, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
 		}
 		else if(BitsPerPixel < 36) {
-			std::cout << "Converting source image to grayscale\n";
+			Stegano::Logger::Log("Converting source image to grayscale", '\n');
 			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
 		}
 		else if(BitsPerPixel < 48) {
-			std::cout << "Reducing source image area by 4\n";
+			Stegano::Logger::Log("Reducing source image area by 4", '\n');
 			cv::resize(SourceImage, SourceImage, cv::Size(), 0.25, 0.25, cv::INTER_AREA);
 		}
 		else if(BitsPerPixel < 72) {
-			std::cout << "Reducing source image area by 2 and converting to grayscale\n";
+			Stegano::Logger::Log("Reducing source image area by 2 and converting to grayscale", '\n');
 			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
 			cv::resize(SourceImage, SourceImage, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
 		}
 		else if(BitsPerPixel < 96) {
-			std::cout << "Reducing source image area by 8\n";
+			Stegano::Logger::Log("Reducing source image area by 8", '\n');
 			cv::resize(SourceImage, SourceImage, cv::Size(), 0.125, 0.125, cv::INTER_AREA);
 		}
 		else if(BitsPerPixel < 144) {
-			std::cout << "Reducing source image area by 4 and converting to grayscale\n";
+			Stegano::Logger::Log("Reducing source image area by 4 and converting to grayscale", '\n');
 			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
 			cv::resize(SourceImage, SourceImage, cv::Size(), 0.25, 0.25, cv::INTER_AREA);
 		}
 		else if(BitsPerPixel < 288) {
-			std::cout << "Reducing source image area by 8 and converting to grayscale\n";
+			Stegano::Logger::Log("Reducing source image area by 8 and converting to grayscale", '\n');
 			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
 			cv::resize(SourceImage, SourceImage, cv::Size(), 0.125, 0.125, cv::INTER_AREA);
 		}
 		BitsToEncode = SourceImage.rows * SourceImage.cols * 8 * SourceImage.channels();
-		if(verbose) {
-			std::cout << "Modified source image size = [" << SourceImage.rows << " x " << SourceImage.cols << " x "
-					  << SourceImage.channels() << ']' << "\n\n";
-		}
+		Stegano::Logger::Verbose("Modified source image size = [", SourceImage.rows, " x ", SourceImage.cols, " x ", SourceImage.channels(),
+								 ']', "\n\n");
 		BitsPerPixel = BitsToEncode / AvailableBasePixels;
 	}
 
@@ -135,9 +139,7 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 		cv::imshow("Base", BaseCopy);
 	}
 
-	if(verbose) {
-		std::cout << "Encoding now...\n";
-	}
+	Stegano::Logger::Verbose("Encoding now...", '\n');
 
 	// const unsigned int RequiredPixels = BitsToEncode / (BitsPerPixel + 1U);
 	// Stride between each hiding pixel. Stride = (AvailableBasePixels / RequiredPixels) - 1
@@ -161,8 +163,7 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	** Checksum is the last channel of 2nd pixel used by the trailer
 	** Checksum = XOR(trailer in 8 bit chunks, last channel in BaseImage)
 	*/
-	trailer[4]
-		= static_cast<unsigned char>(trailer[0] ^ trailer[1] ^ trailer[2] ^ trailer[3] ^ BaseImage.data[TotalBaseChannels - 1]);
+	trailer[4] = static_cast<unsigned char>(trailer[0] ^ trailer[1] ^ trailer[2] ^ trailer[3] ^ BaseImage.data[TotalBaseChannels - 1]);
 
 	// Applying Trailer in 2 bits per channel => 6 pixels and 2 channels for the trailer
 	for(unsigned int ch{21}, i{0}, done{0}; ch > 1; --ch, done += 2) {
@@ -171,13 +172,11 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 			++i;
 		}
 		BaseImage.data[TotalBaseChannels - ch] -= BaseImage.data[TotalBaseChannels - ch] % PowersOfTwo[2];
-		BaseImage.data[TotalBaseChannels - ch]
-			+= static_cast<unsigned char>((trailer[i] / PowersOfTwo[6U - done]) % PowersOfTwo[2]);
+		BaseImage.data[TotalBaseChannels - ch] += static_cast<unsigned char>((trailer[i] / PowersOfTwo[6U - done]) % PowersOfTwo[2]);
 	}
 
 	const std::array<unsigned int, 3> bpch{BPCH[BitsPerPixel]};
-	const unsigned int TotalSourceImageChannels{
-		static_cast<unsigned int>(SourceImage.rows * SourceImage.cols * SourceImage.channels())};
+	const unsigned int TotalSourceImageChannels{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols * SourceImage.channels())};
 	unsigned char *const SourceImageData{SourceImage.data}, *const BaseImageData{BaseImage.data};
 	for(unsigned int i{0}, j{0}, TransferredBits{0}, BGR{0}; j < TotalSourceImageChannels; ++BGR, ++i) {
 		if(BGR == 3U) {
@@ -196,8 +195,7 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 				TransferredBits = NextChannelBits;
 			}
 			else {
-				BaseImageData[i]
-					+= (SourceImageData[j] / PowersOfTwo[(8U - ChannelBits) - TransferredBits]) % PowersOfTwo[ChannelBits];
+				BaseImageData[i] += (SourceImageData[j] / PowersOfTwo[(8U - ChannelBits) - TransferredBits]) % PowersOfTwo[ChannelBits];
 				TransferredBits += ChannelBits;
 				if(TransferredBits == 8U) {
 					TransferredBits = 0U;
@@ -207,29 +205,25 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 		}
 	}
 
-	if(verbose) {
-		std::cout << "Finished encoding\n";
-		std::cout << "Saving encoded image\n";
-	}
+	Stegano::Logger::Verbose("Finished encoding", '\n', "Saving encoded image", '\n');
 
 	try {
-		cv::imwrite(
-			OutputFilePath, BaseImage,
-			std::vector<int>{cv::IMWRITE_PNG_COMPRESSION, 4, cv::IMWRITE_PNG_STRATEGY, cv::IMWRITE_PNG_STRATEGY_FILTERED});
-		std::cout << "Image saved at - " << OutputFilePath << "\n";
+		cv::imwrite(OutputFilePath, BaseImage,
+					std::vector<int>{cv::IMWRITE_PNG_COMPRESSION, 4, cv::IMWRITE_PNG_STRATEGY, cv::IMWRITE_PNG_STRATEGY_FILTERED});
+		Stegano::Logger::Log("Image saved at - ", OutputFilePath, '\n');
 	}
 	catch(cv::Exception& e) {
 		if(e.code == -2) {
-			std::cerr << "Error! Cannot save the output file with the given name!\n";
-			std::cout << "If this is a privileged directory, please run this application in elevated mode.\n";
-			std::cout << "Saving as Encoded.png in the working directory";
+			Stegano::Logger::Error("Error!", " Cannot save the output file with the given name!", '\n');
+			Stegano::Logger::Log("If this is a privileged directory, please run this application in elevated mode.", '\n',
+								 "Saving as Encoded.png in the working directory");
 			try {
 				cv::imwrite("Encoded.png", BaseImage);
-				std::cout << "Image saved at - .\\Encoded.png\n\n";
+				Stegano::Logger::Log("Image saved at - .\\Encoded.png", '\n');
 			}
 			catch(cv::Exception& E) {
 				if(E.code == -2) {
-					std::cerr << "Error! Cannot save as Encoded.png as well, skipping save step.\n\n";
+					Stegano::Logger::Error("Error!", " Cannot save as Encoded.png as well, skipping save step.", '\n');
 				}
 			}
 		}
@@ -246,4 +240,5 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 
 	return true;
 }
+
 }

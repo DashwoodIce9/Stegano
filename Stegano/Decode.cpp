@@ -1,22 +1,20 @@
 #include <opencv2/opencv.hpp>
-#include <iostream>
+#include "SteganoLogger.h"
 #include "SteganoCommon.h"
 
 namespace Stegano {
+
 bool Decode(const std::string& source, const std::string& OutputFilePath) {
-	if(verbose) {
-		std::cout << "Reading source image\n";
-	}
+	Stegano::Logger::Verbose("Reading source image", '\n');
+
 	cv::Mat SourceImage{cv::imread(source, cv::IMREAD_COLOR)};
 	if(!SourceImage.data) {
-		std::cerr << "Error! Cannot open base image. Please check if the path is correct and if the file is an 8 bit "
-					 "color image.\n";
+		Stegano::Logger::Error("Error!", " Cannot open base image.",
+							   " Please check if the path is correct and if the file is an 8 bit color image.", '\n');
 		return false;
 	}
-	if(verbose) {
-		std::cout << "Source image size = [" << SourceImage.rows << " x " << SourceImage.cols << " x " << SourceImage.channels()
-				  << "]\n\n";
-	}
+	Stegano::Logger::Verbose("Source image size = [", SourceImage.rows, " x ", SourceImage.cols, " x ", SourceImage.channels(), ']',
+							 "\n\n");
 
 	const unsigned int AvailableBasePixels{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols - 7)};
 	const unsigned int TotalBaseChannels{AvailableBasePixels * 3U + 21U};
@@ -34,13 +32,20 @@ bool Decode(const std::string& source, const std::string& OutputFilePath) {
 
 	// Checking validity of the trailer
 	if((trailer[0] ^ trailer[1] ^ trailer[2] ^ trailer[3] ^ SourceImage.data[TotalBaseChannels - 1]) != trailer[4]) {
-		std::cerr << "The given image does not have any data embedded using this application\n";
+		Stegano::Logger::Error("Error!", " The given image does not have any data embedded using this application", '\n');
 		return false;
 	}
 
-	if(verbose) {
-		std::cout << "Encoded image found, decoding...\n";
+	if(showimages) {
+		cv::Mat SourceCopy{SourceImage};
+#if _WIN32
+		ResizeToSmall(SourceImage, SourceCopy, "Source Image");
+#endif
+		cv::namedWindow("Source", cv::WINDOW_AUTOSIZE);
+		cv::imshow("Source", SourceCopy);
 	}
+
+	Stegano::Logger::Verbose("Encoded image found, decoding...", '\n');
 
 	unsigned int DecodedImageRows{trailer[0]}, DecodedImageColumns{trailer[2]};
 	DecodedImageRows *= PowersOfTwo[8];
@@ -92,29 +97,25 @@ bool Decode(const std::string& source, const std::string& OutputFilePath) {
 		}
 	}
 
-	if(verbose) {
-		std::cout << "Finished decoding\n";
-		std::cout << "Saving decoded image\n";
-	}
+	Stegano::Logger::Verbose("Finished decoding", '\n', "Saving decoded image", '\n');
 
 	try {
-		cv::imwrite(
-			OutputFilePath, DecodedImage,
-			std::vector<int>{cv::IMWRITE_PNG_COMPRESSION, 4, cv::IMWRITE_PNG_STRATEGY, cv::IMWRITE_PNG_STRATEGY_FILTERED});
-		std::cout << "Image saved at - " << OutputFilePath << "\n\n";
+		cv::imwrite(OutputFilePath, DecodedImage,
+					std::vector<int>{cv::IMWRITE_PNG_COMPRESSION, 4, cv::IMWRITE_PNG_STRATEGY, cv::IMWRITE_PNG_STRATEGY_FILTERED});
+		Stegano::Logger::Log("Image saved at - ", OutputFilePath, '\n');
 	}
 	catch(cv::Exception& e) {
 		if(e.code == -2) {
-			std::cerr << "Error! Cannot save the output file with the given name!\n";
-			std::cout << "If this is a privileged directory, please run this application in elevated mode.\n";
-			std::cout << "Saving as Decoded.png in the working directory";
+			Stegano::Logger::Error("Error!", " Cannot save the output file with the given name!", '\n');
+			Stegano::Logger::Log("If this is a privileged directory, please run this application in elevated mode.", '\n',
+								 "Saving as Decoded.png in the working directory");
 			try {
 				cv::imwrite("Decoded.png", DecodedImage);
-				std::cout << "Image saved at - .\\Decoded.png\n";
+				Stegano::Logger::Log("Image saved at - .\\Decoded.png", '\n');
 			}
 			catch(cv::Exception& E) {
 				if(E.code == -2) {
-					std::cerr << "Error! Cannot save as Decoded.png as well, skipping save step.\n";
+					Stegano::Logger::Error("Error!", " Cannot save as Decoded.png as well, skipping save step.", '\n');
 				}
 			}
 		}
@@ -131,4 +132,5 @@ bool Decode(const std::string& source, const std::string& OutputFilePath) {
 
 	return true;
 }
+
 }
