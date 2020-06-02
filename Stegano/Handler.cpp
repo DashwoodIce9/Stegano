@@ -8,22 +8,42 @@
 #endif
 
 namespace Stegano {
-extern bool quiet{false}, verbose{false}, showimages{false}, base{false}, force{false}, noreduc{false}, grayscale{false};
+extern bool quiet{false}, verbose{false}, showimages{false};
 extern int threads{1};
 
 #if _WIN32
 extern long DesktopWidth{0}, DesktopHeight{0};
 #endif
 
-bool Encode(const std::string& base, const std::string& source, const std::string& OutputFilePath);
-bool Decode(const std::string& source, const std::string& OutputFilePath);
+/**
+ * @brief Encodes source image in base
+ * @param base -> Base image path
+ * @param source -> Source image path
+ * @param output -> Output image path
+ * @param expandbase -> Expands base, does not shrink source during reduction phase
+ * @param force -> Force encode even if base is not large enough
+ * @param noreduc -> Skip reduction phase
+ * @param grayscale -> Prefer conversion to grayscale over shrinking during reduction phase
+ * @return true => Success
+ */
+inline bool Encode(const std::string& base, const std::string& source, const std::string& output, const bool& expandbase, const bool& force,
+				   const bool& noreduc, const bool& grayscale);
+/**
+ * @brief Decodes the hidden image in source image
+ * @param source -> Source image path
+ * @param output -> Output image path
+ * @return true => Success
+ */
+inline bool Decode(const std::string& source, const std::string& output);
 
-void hold() {
+// Hold Screen
+static inline void hold() {
 	std::cout << "Press enter/return to exit";
 	std::cin.get();
 }
 
-static void help() {
+// Display help
+static inline void help() {
 	std::cout << '\n';
 	std::cout << "------------------------------------------------------ Help ------------------------------------------------------"
 			  << "\n\n";
@@ -96,18 +116,45 @@ static void help() {
 			  << "DashwoodIce9" << '\n';
 }
 
-static bool LoopThroughArgs(const int start, const int& argc, const char** argv, std::string* OutputFilePath) {
+// Display invalid arguments error
+static inline void invalidargs() {
+	Stegano::Logger::Error("Error!", " Invalid arguments passed!", "\n\n");
+	Stegano::Logger::Log("To encode, run - \"Stegano.exe encode <base> <source>\"", '\n',
+						 "To decode, run - \"Stegano.exe decode <source>\"", "\n\n",
+						 "Run - \"Stegano.exe help\" for a full list of commands.", '\n');
+}
+
+/**
+ * @brief Loops through the command line arguments passed and sets the global variables controlling program execution
+ * @param start -> Position to start the loop from, different for Encode and Decode modes
+ * @param argc -> Argument count
+ * @param argv -> Argument vector
+ * @param output -> Sets output file path string
+ * @param expandbase -> Sets expandbase boolean
+ * @param force -> Sets force boolean
+ * @param noreduc -> Sets noreduc boolean
+ * @param grayscale -> Sets grayscale boolean
+ * @return true => Success
+ */
+static inline bool LoopThroughArgs(const int start, const int& argc, const char** argv, std::string* output, bool* expandbase, bool* force,
+								   bool* noreduc, bool* grayscale) {
 	for(int i = start; i < argc; ++i) {
 		if(std::string(argv[i]) == "/o" || std::string(argv[i]) == "/O" || std::string(argv[i]) == "output") {
-			std::string ext{argv[i + 1]};
-			ext = ext.substr(ext.find_last_of('.') + 1);
-			if(ext == "png" || ext == "PNG") {
-				*OutputFilePath = argv[i + 1];
+			++i;
+			if(i < argc) {
+				std::string ext{argv[i]};
+				ext = ext.substr(ext.find_last_of('.') + 1);
+				if(ext == "png" || ext == "PNG") {
+					*output = argv[i];
+				}
+				else {
+					Stegano::Logger::Log('\n', "Given output path - \"", argv[i], "\" does not end in .png, reverting to default.", '\n');
+				}
 			}
 			else {
-				Stegano::Logger::Log('\n', "Given output path does not end in .png, reverting to default.", '\n');
+				Stegano::Logger::Log('\n', "Output file path not found", '\n');
+				return false;
 			}
-			++i;
 		}
 		else if(std::string(argv[i]) == "/q" || std::string(argv[i]) == "/Q" || std::string(argv[i]) == "quiet") {
 			quiet = true;
@@ -119,67 +166,84 @@ static bool LoopThroughArgs(const int start, const int& argc, const char** argv,
 			showimages = true;
 		}
 		else if(std::string(argv[i]) == "/g" || std::string(argv[i]) == "/G" || std::string(argv[i]) == "grayscale") {
-			grayscale = true;
+			*grayscale = true;
 		}
 		else if(std::string(argv[i]) == "/f" || std::string(argv[i]) == "/F" || std::string(argv[i]) == "force") {
-			force = true;
+			*force = true;
 		}
 		else if(std::string(argv[i]) == "/nr" || std::string(argv[i]) == "/NR" || std::string(argv[i]) == "noreduc") {
-			noreduc = true;
+			*noreduc = true;
 		}
 		else if(std::string(argv[i]) == "/t" || std::string(argv[i]) == "/T" || std::string(argv[i]) == "threads") {
-			threads = std::stoi(argv[i + 1]);
-			if(threads < 1 || threads > 512) {
-				Stegano::Logger::Log('\n', "Improper value for threads passed, defaulting to single threaded operation.", '\n');
-				threads = 1;
-			}
 			++i;
+			if(i < argc) {
+				threads = std::stoi(argv[i]);
+				if(threads < 1 || threads > 512) {
+					Stegano::Logger::Log('\n', "Improper value for threads passed, defaulting to single threaded operation.", '\n');
+					threads = 1;
+				}
+			}
+			else {
+				Stegano::Logger::Log('\n', "Thread count value not found", '\n');
+				return false;
+			}
 		}
 		else if(std::string(argv[i]) == "/b" || std::string(argv[i]) == "/B" || std::string(argv[i]) == "base") {
-			base = true;
+			*expandbase = true;
 		}
 		else {
-			return true;
+			return false;
 		}
 	}
-	Stegano::Logger::Log('\n', "\t\tImage Steganography Tool ", "(command line mode)", "\n\n");
-	return false;
+	return true;
 }
 
-int handler(const int& argc, const char** argv) {
-	bool decode{false};
-	std::string Base, Source, OutputFilePath{"Encoded.png"};
+/**
+ * @brief Handler of program execution, decides mode (interactive, command line), deduces flags, calls Encode() or Decode()
+ * @param argc -> Argument count
+ * @param argv -> Argument vector
+ * @return true => Success
+ */
+static inline bool handler(const int& argc, const char** argv) {
+	bool decode{false}, expandbase{false}, force{false}, noreduc{false}, grayscale{false};
+	std::string Base, Source, output{"Encoded.png"};
 
 	if(argc > 1) {
 		if(std::string(argv[1]) == "/h" || std::string(argv[1]) == "/H" || std::string(argv[1]) == "help") {
 			help();
-			return 0;
+			return true;
 		}
 		if(argc > 2) {
+			Stegano::Logger::Log('\n', "\t\tImage Steganography Tool ", "(command line mode)", "\n\n");
 			if(std::string(argv[1]) == "/D" || std::string(argv[1]) == "/d" || std::string(argv[1]) == "decode") {
 				decode = true;
 				Source = argv[2];
-				OutputFilePath = "Decoded.png";
-				if(LoopThroughArgs(3, argc, argv, &OutputFilePath)) {
-					return 1;
+				output = "Decoded.png";
+				if(!LoopThroughArgs(3, argc, argv, &output, &expandbase, &force, &noreduc, &grayscale)) {
+					invalidargs();
+					return false;
 				}
 			}
 			else if(argc > 3) {
 				if(!(std::string(argv[1]) == "/E" || std::string(argv[1]) == "/e" || std::string(argv[1]) == "encode")) {
-					return 1;
+					invalidargs();
+					return false;
 				}
 				Base = argv[2];
 				Source = argv[3];
-				if(LoopThroughArgs(4, argc, argv, &OutputFilePath)) {
-					return 1;
+				if(!LoopThroughArgs(4, argc, argv, &output, &expandbase, &force, &noreduc, &grayscale)) {
+					invalidargs();
+					return false;
 				}
 			}
 			else {
-				return 1;
+				invalidargs();
+				return false;
 			}
 		}
 		else {
-			return 1;
+			invalidargs();
+			return false;
 		}
 	}
 	else {
@@ -204,7 +268,7 @@ int handler(const int& argc, const char** argv) {
 			std::getline(std::cin, Source);
 		}
 		else if(in == 'd' || in == 'D') {
-			OutputFilePath = "Decoded.png";
+			output = "Decoded.png";
 			decode = true;
 			std::cout << '\n' << "Decode Mode" << '\n';
 			std::cout << "Enter the source image path: ";
@@ -213,11 +277,11 @@ int handler(const int& argc, const char** argv) {
 		else if(in == 'h' || in == 'H') {
 			std::cout << "\n\n";
 			help();
-			return 2;
+			hold();
 		}
 		else {
 			Stegano::Logger::Error('\n', "Invalid input!", '\n');
-			return 3;
+			hold();
 		}
 	}
 
@@ -228,15 +292,45 @@ int handler(const int& argc, const char** argv) {
 	GetWindowRect(GetDesktopWindow(), &desktop);
 	DesktopWidth = desktop.right;
 	DesktopHeight = desktop.bottom;
-	Stegano::Logger::Verbose("Screen resolution is: [", DesktopWidth, " x ", DesktopHeight, ']', "\n\n");
+	Stegano::Logger::Verbose("Screen resolution is: [", DesktopWidth, " x ", DesktopHeight, ']', '\n');
 #endif
 
+	Stegano::Logger::Verbose("Output file path = ", output, '\n');
+	showimages ? Stegano::Logger::Verbose("Show Images = ", "true", '\n') : Stegano::Logger::Verbose("Show Images = ", "false", '\n');
+	if(threads != 1) {
+		Stegano::Logger::Verbose("Thread count = ", threads, '\n');
+	}
+	std::cout << '\n';
 	// Add multithreading code
 
-	if(decode ? !Decode(Source, OutputFilePath) : !Encode(Base, Source, OutputFilePath)) {
-		return 4;
+	if(decode ? !Decode(Source, output) : !Encode(Base, Source, output, expandbase, force, noreduc, grayscale)) {
+		return false;
 	}
 
+	return true;
+}
+
+/**
+ * @brief Calls handler(), finishes program execution
+ * @param argc -> Argument count
+ * @param argv -> Argument vector
+ * @return 0 => Successful execution, 1 => Failure in execution
+ */
+int run(const int& argc, const char** argv) {
+	if(!handler(argc, argv)) {
+		if(argc == 1) {
+			hold();
+		}
+		return 1;
+	}
+
+	// For successful run of interactive mode
+	if(argc == 1) {
+		hold();
+	}
+	else {
+		std::cout << '\n';
+	}
 	return 0;
 }
 }
