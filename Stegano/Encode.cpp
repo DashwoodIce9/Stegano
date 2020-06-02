@@ -17,6 +17,12 @@ namespace Stegano {
 extern bool base, force, noreduc, grayscale;
 
 #if _WIN32
+/**
+ * @brief Resizes display images to fit the screen. Resizes only displayed images not the one saved on disk.
+ * @param input -> Input image object
+ * @param output -> Output image object
+ * @param name -> Image name (for verbose logging)
+ */
 void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name) {
 	const double hRatio{static_cast<double>(DesktopWidth) / static_cast<double>(input.cols)};
 	const double vRatio{static_cast<double>(DesktopHeight) / static_cast<double>(input.rows)};
@@ -41,7 +47,12 @@ void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& nam
 }
 #endif
 
-bool Encode(const std::string& base, const std::string& source, const std::string& OutputFilePath) {
+bool Encode(const std::string& base, const std::string& source, const std::string& output, const bool& expandbase, const bool& force,
+			const bool& noreduc, const bool& grayscale) {
+	Stegano::Logger::Verbose("Exapnd base = ", expandbase ? "true" : "false", '\n');
+	Stegano::Logger::Verbose("No reduction = ", noreduc ? "true" : "false", '\n');
+	Stegano::Logger::Verbose("Prefer grayscale = ", grayscale ? "true" : "false", '\n');
+	Stegano::Logger::Verbose("Forced encode = ", force ? "true" : "false", '\n');
 	Stegano::Logger::Verbose("Reading base image", '\n');
 	cv::Mat BaseImage{cv::imread(base, cv::IMREAD_COLOR)};
 	Stegano::Logger::Verbose("Reading source image", '\n');
@@ -58,7 +69,7 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	}
 	if(BaseImage.rows > 65535 || BaseImage.cols > 65535) {
 		Stegano::Logger::Error("Error!", " Base image too large.",
-							   " Cannot operate on images with dimensions greater than [65536 x 65536].\n");
+							   " Cannot operate on images with dimensions greater than [65536 x 65536].", '\n');
 		return false;
 	}
 	if(SourceImage.rows > 65535 || SourceImage.cols > 65535) {
@@ -85,41 +96,40 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 			return false;
 		}
 		if(BitsPerPixel >= 288) { // Not reducing beyond 8x and grayscale conversion (for now)
-			Stegano::Logger::Error("Cannot encode without significant loss in visual fidelity.", " Please choose a larger base image",
-								   '\n');
+			Stegano::Logger::Error("Cannot encode without significant loss in visual fidelity. Please choose a larger base image", '\n');
 			return false;
 		}
 		Stegano::Logger::Log("Base image not large enough, reducing source image", '\n');
 		if(BitsPerPixel < 24) {
-			Stegano::Logger::Log("Reducing source image area by 2", '\n');
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
+			Stegano::Logger::Log("Reducing source image area by ", '2', '\n');
+			cv::resize(SourceImage, SourceImage, cv::Size(), 0.708, 0.708, cv::INTER_AREA);
 		}
 		else if(BitsPerPixel < 36) {
 			Stegano::Logger::Log("Converting source image to grayscale", '\n');
 			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
 		}
 		else if(BitsPerPixel < 48) {
-			Stegano::Logger::Log("Reducing source image area by 4", '\n');
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.25, 0.25, cv::INTER_AREA);
+			Stegano::Logger::Log("Reducing source image area by ", '4', '\n');
+			cv::resize(SourceImage, SourceImage, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
 		}
 		else if(BitsPerPixel < 72) {
-			Stegano::Logger::Log("Reducing source image area by 2 and converting to grayscale", '\n');
+			Stegano::Logger::Log("Reducing source image area by ", '2', " and converting to grayscale", '\n');
+			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
+			cv::resize(SourceImage, SourceImage, cv::Size(), 0.708, 0.708, cv::INTER_AREA);
+		}
+		else if(BitsPerPixel < 96) {
+			Stegano::Logger::Log("Reducing source image area by ", '8', '\n');
+			cv::resize(SourceImage, SourceImage, cv::Size(), 0.355, 0.355, cv::INTER_AREA);
+		}
+		else if(BitsPerPixel < 144) {
+			Stegano::Logger::Log("Reducing source image area by ", '4', " and converting to grayscale", '\n');
 			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
 			cv::resize(SourceImage, SourceImage, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
 		}
-		else if(BitsPerPixel < 96) {
-			Stegano::Logger::Log("Reducing source image area by 8", '\n');
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.125, 0.125, cv::INTER_AREA);
-		}
-		else if(BitsPerPixel < 144) {
-			Stegano::Logger::Log("Reducing source image area by 4 and converting to grayscale", '\n');
-			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.25, 0.25, cv::INTER_AREA);
-		}
 		else if(BitsPerPixel < 288) {
-			Stegano::Logger::Log("Reducing source image area by 8 and converting to grayscale", '\n');
+			Stegano::Logger::Log("Reducing source image area by ", '8', " and converting to grayscale", '\n');
 			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.125, 0.125, cv::INTER_AREA);
+			cv::resize(SourceImage, SourceImage, cv::Size(), 0.355, 0.355, cv::INTER_AREA);
 		}
 		BitsToEncode = SourceImage.rows * SourceImage.cols * 8 * SourceImage.channels();
 		Stegano::Logger::Verbose("Modified source image size = [", SourceImage.rows, " x ", SourceImage.cols, " x ", SourceImage.channels(),
@@ -208,9 +218,9 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	Stegano::Logger::Verbose("Finished encoding", '\n', "Saving encoded image", '\n');
 
 	try {
-		cv::imwrite(OutputFilePath, BaseImage,
+		cv::imwrite(output, BaseImage,
 					std::vector<int>{cv::IMWRITE_PNG_COMPRESSION, 4, cv::IMWRITE_PNG_STRATEGY, cv::IMWRITE_PNG_STRATEGY_FILTERED});
-		Stegano::Logger::Log("Image saved at - ", OutputFilePath, '\n');
+		Stegano::Logger::Log("Image saved at - ", output, '\n');
 	}
 	catch(cv::Exception& e) {
 		if(e.code == -2) {
