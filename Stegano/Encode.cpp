@@ -1,15 +1,8 @@
-#include <opencv2/opencv.hpp>
-#include "SteganoLogger.h"
 #include "SteganoCommon.h"
 
 /* TODO
 ** Add functionality to support images with FP16/32 channel types
-** Add support to encode beyond 8x reduction in image sizes
-** Add option to set preference for size reduction or grayscale conversion if bpch > 12
 ** Multithreading
-** Add support for no reduction
-** Add support for force encoding, i.e. encode even if base is not large enough. Portion of source will not be encoded
-** Add support for converting source/base to grayscale and to enlarge or shrink them by given factors
 */
 
 namespace Stegano {

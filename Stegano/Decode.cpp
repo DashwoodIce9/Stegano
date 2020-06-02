@@ -1,5 +1,3 @@
-#include <opencv2/opencv.hpp>
-#include "SteganoLogger.h"
 #include "SteganoCommon.h"
 
 namespace Stegano {
