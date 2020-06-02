@@ -23,11 +23,11 @@ extern long DesktopWidth{0}, DesktopHeight{0};
  * @param expandbase -> Expands base, does not shrink source during reduction phase
  * @param force -> Force encode even if base is not large enough
  * @param noreduc -> Skip reduction phase
- * @param grayscale -> Prefer conversion to grayscale over shrinking during reduction phase
+ * @param nograyscale -> Disables conversion to grayscale during reduction phase
  * @return true => Success
  */
 inline bool Encode(const std::string& base, const std::string& source, const std::string& output, const bool& expandbase, const bool& force,
-				   const bool& noreduc, const bool& grayscale);
+				   const bool& noreduc, const bool& nograyscale);
 /**
  * @brief Decodes the hidden image in source image
  * @param source -> Source image path
@@ -57,7 +57,7 @@ static inline void help() {
 			  << "\n\t"
 			  << "[{output | /o | /O} <path>] {quiet | /q | /Q} {verbose | /v | /V} {show | /s | /S} {noreduc | /nr | /NR}"
 			  << "\n\t"
-			  << "{force | /f | /F} {gray | /g | /G} {base | /b | /B} [{threads | /t | /T} 1...512]"
+			  << "{force | /f | /F} {nogray | /ng | /NG} {base | /b | /B} [{threads | /t | /T} 1...512]"
 			  << "\n\n";
 	std::cout << "DESCRIPTION"
 			  << "\n\t"
@@ -101,7 +101,7 @@ static inline void help() {
 			  << "\n\t\t"
 			  << "A portion of source will be lost in this process."
 			  << "\n\n\t";
-	std::cout << "7) gray (optional) - Prefer conversion to grayscale over dimension shrinking during reduction process."
+	std::cout << "7) nogray (optional) - Disables grayscale conversion during reduction process."
 			  << "\n\n\t";
 	std::cout << "8) base (optional, disables => gray) - Apply expanding transformation on the base image if it is not large"
 			  << "\n\t\t"
@@ -133,11 +133,11 @@ static inline void invalidargs() {
  * @param expandbase -> Sets expandbase boolean
  * @param force -> Sets force boolean
  * @param noreduc -> Sets noreduc boolean
- * @param grayscale -> Sets grayscale boolean
+ * @param nograyscale -> Sets nograyscale boolean
  * @return true => Success
  */
 static inline bool LoopThroughArgs(const int start, const int& argc, const char** argv, std::string* output, bool* expandbase, bool* force,
-								   bool* noreduc, bool* grayscale) {
+								   bool* noreduc, bool* nograyscale) {
 	for(int i = start; i < argc; ++i) {
 		if(std::string(argv[i]) == "/o" || std::string(argv[i]) == "/O" || std::string(argv[i]) == "output") {
 			++i;
@@ -165,8 +165,8 @@ static inline bool LoopThroughArgs(const int start, const int& argc, const char*
 		else if(std::string(argv[i]) == "/s" || std::string(argv[i]) == "/S" || std::string(argv[i]) == "show") {
 			showimages = true;
 		}
-		else if(std::string(argv[i]) == "/g" || std::string(argv[i]) == "/G" || std::string(argv[i]) == "grayscale") {
-			*grayscale = true;
+		else if(std::string(argv[i]) == "/ng" || std::string(argv[i]) == "/NG" || std::string(argv[i]) == "nograyscale") {
+			*nograyscale = true;
 		}
 		else if(std::string(argv[i]) == "/f" || std::string(argv[i]) == "/F" || std::string(argv[i]) == "force") {
 			*force = true;
@@ -205,7 +205,7 @@ static inline bool LoopThroughArgs(const int start, const int& argc, const char*
  * @return true => Success
  */
 static inline bool handler(const int& argc, const char** argv) {
-	bool decode{false}, expandbase{false}, force{false}, noreduc{false}, grayscale{false};
+	bool decode{false}, expandbase{false}, force{false}, noreduc{false}, nograyscale{false};
 	std::string Base, Source, output{"Encoded.png"};
 
 	if(argc > 1) {
@@ -219,7 +219,7 @@ static inline bool handler(const int& argc, const char** argv) {
 				decode = true;
 				Source = argv[2];
 				output = "Decoded.png";
-				if(!LoopThroughArgs(3, argc, argv, &output, &expandbase, &force, &noreduc, &grayscale)) {
+				if(!LoopThroughArgs(3, argc, argv, &output, &expandbase, &force, &noreduc, &nograyscale)) {
 					invalidargs();
 					return false;
 				}
@@ -231,7 +231,7 @@ static inline bool handler(const int& argc, const char** argv) {
 				}
 				Base = argv[2];
 				Source = argv[3];
-				if(!LoopThroughArgs(4, argc, argv, &output, &expandbase, &force, &noreduc, &grayscale)) {
+				if(!LoopThroughArgs(4, argc, argv, &output, &expandbase, &force, &noreduc, &nograyscale)) {
 					invalidargs();
 					return false;
 				}
@@ -303,7 +303,7 @@ static inline bool handler(const int& argc, const char** argv) {
 	std::cout << '\n';
 	// Add multithreading code
 
-	if(decode ? !Decode(Source, output) : !Encode(Base, Source, output, expandbase, force, noreduc, grayscale)) {
+	if(decode ? !Decode(Source, output) : !Encode(Base, Source, output, expandbase, force, noreduc, nograyscale)) {
 		return false;
 	}
 
