@@ -14,7 +14,7 @@
 
 namespace Stegano {
 
-extern bool base, force, noreduc, grayscale;
+extern bool base, force, noreduc, nograyscale;
 
 #if _WIN32
 /**
@@ -48,10 +48,10 @@ void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& nam
 #endif
 
 bool Encode(const std::string& base, const std::string& source, const std::string& output, const bool& expandbase, const bool& force,
-			const bool& noreduc, const bool& grayscale) {
+			const bool& noreduc, const bool& nograyscale) {
 	Stegano::Logger::Verbose("Exapnd base = ", expandbase ? "true" : "false", '\n');
 	Stegano::Logger::Verbose("No reduction = ", noreduc ? "true" : "false", '\n');
-	Stegano::Logger::Verbose("Prefer grayscale = ", grayscale ? "true" : "false", '\n');
+	Stegano::Logger::Verbose("No grayscale = ", nograyscale ? "true" : "false", '\n');
 	Stegano::Logger::Verbose("Forced encode = ", force ? "true" : "false", '\n');
 	Stegano::Logger::Verbose("Reading base image", '\n');
 	cv::Mat BaseImage{cv::imread(base, cv::IMREAD_COLOR)};
@@ -79,62 +79,130 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	}
 
 	// Using 7 pixels for the trailer (see definition below)
-	const unsigned int AvailableBasePixels{static_cast<unsigned int>(BaseImage.rows * BaseImage.cols - 7)};
-	const unsigned int TotalBaseChannels{AvailableBasePixels * 3U + 21U};
+	unsigned int AvailableBasePixels{static_cast<unsigned int>(BaseImage.rows * BaseImage.cols - 7)};
+	unsigned int TotalBaseChannels{AvailableBasePixels * 3U + 21U};
 	unsigned int BitsToEncode{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols * 24)};
 	unsigned int BitsPerPixel{BitsToEncode / AvailableBasePixels}; // zero indexed for BPCH, add 1 to get actual value
 
 	Stegano::Logger::Verbose("Base image size = [", BaseImage.rows, " x ", BaseImage.cols, " x ", BaseImage.channels(), ']', '\n',
 							 "Source image size = [", SourceImage.rows, " x ", SourceImage.cols, " x ", SourceImage.channels(), ']',
 							 "\n\n");
-
-	if(BitsPerPixel >= 12) {
-		if(noreduc && !force) {
-			Stegano::Logger::Error("Error!", " Image reduction is disabled and base image is not large enough to store the source image",
-								   '\n');
-			Stegano::Logger::Log("Rerun without \"noreduc\" flag or choose a larger base image", '\n');
-			return false;
+	bool overflow{false};
+	if(BitsPerPixel >= 12U) {
+		if(!noreduc) {
+			if(expandbase) {
+				const unsigned int ExpansionFactor{(BitsToEncode / 12U + 8U) / (static_cast<unsigned int>(BaseImage.rows * BaseImage.cols))
+												   + 1U};
+				if(ExpansionFactor > 8U) {
+					if(!force) {
+						Stegano::Logger::Error(
+							"Error!", " Cannot encode without significant loss in visual fidelity. Please choose a larger base image",
+							'\n');
+						return false;
+					}
+					if(ExpansionFactor > 16U) {
+						Stegano::Logger::Log("Base image not large enough, encoding forcefully. Some part of source will be lost", '\n',
+											 "Expanding base image area by ", 16, '\n');
+						cv::resize(BaseImage, BaseImage, cv::Size(), 4.0, 4.0, cv::INTER_LANCZOS4);
+						overflow = true;
+					}
+					else {
+						Stegano::Logger::Log("Forceful encoding, reducing beyond 8x, this may lead to significant loss of quality.", '\n',
+											 "Expanding base image area by ", ExpansionFactor, '\n');
+						cv::resize(BaseImage, BaseImage, cv::Size(), sqrt(ExpansionFactor), sqrt(ExpansionFactor), cv::INTER_LANCZOS4);
+					}
+				}
+				else {
+					Stegano::Logger::Log("Expanding base image area by ", ExpansionFactor, '\n');
+					cv::resize(BaseImage, BaseImage, cv::Size(), sqrt(ExpansionFactor), sqrt(ExpansionFactor), cv::INTER_LANCZOS4);
+				}
+				AvailableBasePixels = static_cast<unsigned int>(BaseImage.rows * BaseImage.cols - 7);
+				TotalBaseChannels = AvailableBasePixels * 3U + 21U;
+				Stegano::Logger::Verbose("Modified base image size = [", BaseImage.rows, " x ", BaseImage.cols, " x ", BaseImage.channels(),
+										 ']', "\n\n");
+			}
+			else {
+				unsigned int ReductionFactor{BitsPerPixel / 12U + 1U};
+				if(nograyscale) {
+					if(ReductionFactor > 8U) {
+						if(!force) {
+							Stegano::Logger::Error(
+								"Error!", " Cannot encode without significant loss in visual fidelity. Please choose a larger base image",
+								'\n');
+							return false;
+						}
+						if(ReductionFactor > 16U) {
+							Stegano::Logger::Log("Base image not large enough, encoding forcefully. Some part of source will be lost", '\n',
+												 "Reducing source image area by ", 16, '\n');
+							cv::resize(SourceImage, SourceImage, cv::Size(), 0.25, 0.25, cv::INTER_AREA);
+							overflow = true;
+						}
+						else {
+							Stegano::Logger::Log("Forceful encoding, reducing beyond 8x, this may lead to significant loss of quality.",
+												 '\n', "Reducing source image area by ", ReductionFactor, '\n');
+							const double ScalingFactor{1.0 / std::sqrt(static_cast<double>(ReductionFactor))};
+							cv::resize(SourceImage, SourceImage, cv::Size(), ScalingFactor, ScalingFactor, cv::INTER_AREA);
+						}
+					}
+					else {
+						Stegano::Logger::Log("Reducing source image area by ", ReductionFactor, '\n');
+						const double ScalingFactor{1.0 / std::sqrt(static_cast<double>(ReductionFactor))};
+						cv::resize(SourceImage, SourceImage, cv::Size(), ScalingFactor, ScalingFactor, cv::INTER_AREA);
+					}
+				}
+				else {
+					if(ReductionFactor > 24U) {
+						if(!force) {
+							Stegano::Logger::Error(
+								"Error!", " Cannot encode without significant loss in visual fidelity. Please choose a larger base image",
+								'\n');
+							return false;
+						}
+						if(ReductionFactor > 48U) {
+							Stegano::Logger::Log("Base image not large enough, encoding forcefully. Some part of source will be lost", '\n',
+												 "Reducing source image area by ", 16, " and converting to grayscale", '\n');
+							cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
+							cv::resize(SourceImage, SourceImage, cv::Size(), 0.25, 0.25, cv::INTER_AREA);
+							overflow = true;
+						}
+						else {
+							Stegano::Logger::Log("Forceful encoding, reducing beyond 8x, this may lead to significant loss of quality.",
+												 '\n', "Reducing source image area by ", ReductionFactor, " and converting to grayscale",
+												 '\n');
+							cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
+							ReductionFactor = ReductionFactor / 3U + 1U;
+							const double ScalingFactor = 1.0 / std::sqrt(static_cast<double>(ReductionFactor));
+							cv::resize(SourceImage, SourceImage, cv::Size(), ScalingFactor, ScalingFactor, cv::INTER_AREA);
+						}
+					}
+					else {
+						if(ReductionFactor > 3U) {
+							ReductionFactor = ReductionFactor / 3U + 1U;
+							const double ScalingFactor{1.0 / std::sqrt(static_cast<double>(ReductionFactor))};
+							Stegano::Logger::Log("Reducing source image area by ", ReductionFactor, " and converting to grayscale", '\n');
+							cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
+							cv::resize(SourceImage, SourceImage, cv::Size(), ScalingFactor, ScalingFactor, cv::INTER_AREA);
+						}
+						else {
+							Stegano::Logger::Log("Converting source image to grayscale", '\n');
+							cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
+						}
+					}
+				}
+				BitsToEncode = SourceImage.rows * SourceImage.cols * 8 * SourceImage.channels();
+				Stegano::Logger::Verbose("Modified source image size = [", SourceImage.rows, " x ", SourceImage.cols, " x ",
+										 SourceImage.channels(), ']', "\n\n");
+			}
 		}
-		if(BitsPerPixel >= 288) { // Not reducing beyond 8x and grayscale conversion (for now)
-			Stegano::Logger::Error("Cannot encode without significant loss in visual fidelity. Please choose a larger base image", '\n');
-			return false;
+		else {
+			if(!force) {
+				Stegano::Logger::Error("Error!",
+									   " Image reduction is disabled and base image is not large enough to store the source image", '\n');
+				Stegano::Logger::Log("Rerun without \"noreduc\" flag or choose a larger base image", '\n');
+				return false;
+			}
 		}
-		Stegano::Logger::Log("Base image not large enough, reducing source image", '\n');
-		if(BitsPerPixel < 24) {
-			Stegano::Logger::Log("Reducing source image area by ", '2', '\n');
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.708, 0.708, cv::INTER_AREA);
-		}
-		else if(BitsPerPixel < 36) {
-			Stegano::Logger::Log("Converting source image to grayscale", '\n');
-			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
-		}
-		else if(BitsPerPixel < 48) {
-			Stegano::Logger::Log("Reducing source image area by ", '4', '\n');
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
-		}
-		else if(BitsPerPixel < 72) {
-			Stegano::Logger::Log("Reducing source image area by ", '2', " and converting to grayscale", '\n');
-			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.708, 0.708, cv::INTER_AREA);
-		}
-		else if(BitsPerPixel < 96) {
-			Stegano::Logger::Log("Reducing source image area by ", '8', '\n');
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.355, 0.355, cv::INTER_AREA);
-		}
-		else if(BitsPerPixel < 144) {
-			Stegano::Logger::Log("Reducing source image area by ", '4', " and converting to grayscale", '\n');
-			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.5, 0.5, cv::INTER_AREA);
-		}
-		else if(BitsPerPixel < 288) {
-			Stegano::Logger::Log("Reducing source image area by ", '8', " and converting to grayscale", '\n');
-			cv::cvtColor(SourceImage, SourceImage, cv::COLOR_BGR2GRAY);
-			cv::resize(SourceImage, SourceImage, cv::Size(), 0.355, 0.355, cv::INTER_AREA);
-		}
-		BitsToEncode = SourceImage.rows * SourceImage.cols * 8 * SourceImage.channels();
-		Stegano::Logger::Verbose("Modified source image size = [", SourceImage.rows, " x ", SourceImage.cols, " x ", SourceImage.channels(),
-								 ']', "\n\n");
-		BitsPerPixel = BitsToEncode / AvailableBasePixels;
+		BitsPerPixel = overflow ? 11U : BitsToEncode / AvailableBasePixels;
 	}
 
 	if(showimages) {
@@ -153,7 +221,7 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 
 	// const unsigned int RequiredPixels = BitsToEncode / (BitsPerPixel + 1U);
 	// Stride between each hiding pixel. Stride = (AvailableBasePixels / RequiredPixels) - 1
-	const unsigned int stride{(AvailableBasePixels * (BitsPerPixel + 1U) / BitsToEncode) - 1U};
+	const unsigned int stride{overflow ? 0U : (AvailableBasePixels * (BitsPerPixel + 1U) / BitsToEncode) - 1U};
 
 	/* Trailer Config (1 pixel + 2 channels of another pixel = 40 bits)
 	** First 16 bits = number of rows in SourceImage
@@ -188,7 +256,7 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	const std::array<unsigned int, 3> bpch{BPCH[BitsPerPixel]};
 	const unsigned int TotalSourceImageChannels{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols * SourceImage.channels())};
 	unsigned char *const SourceImageData{SourceImage.data}, *const BaseImageData{BaseImage.data};
-	for(unsigned int i{0}, j{0}, TransferredBits{0}, BGR{0}; j < TotalSourceImageChannels; ++BGR, ++i) {
+	for(unsigned int i{0}, j{0}, TransferredBits{0}, BGR{0}; j < TotalSourceImageChannels && i < TotalBaseChannels - 21U; ++BGR, ++i) {
 		if(BGR == 3U) {
 			BGR = 0U;
 			i += stride * 3U;

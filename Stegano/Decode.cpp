@@ -63,13 +63,17 @@ bool Decode(const std::string& source, const std::string& output) {
 
 	const unsigned int TotalDecodedImageChannels{DecodedImageRows * DecodedImageColumns * (DecodedImageGrayscale ? 1U : 3U)};
 	const unsigned int BitsEncoded{TotalDecodedImageChannels * 8U};
-	const unsigned int BitsPerPixel{BitsEncoded / AvailableBasePixels};
+	unsigned int BitsPerPixel{BitsEncoded / AvailableBasePixels};
+	unsigned int stride{(AvailableBasePixels * (BitsPerPixel + 1U) / BitsEncoded) - 1U};
+	if(BitsPerPixel >= 12U) {
+		BitsPerPixel = 11U;
+		stride = 0U;
+	}
 	const std::array<unsigned int, 3> bpch{BPCH[BitsPerPixel]};
-	const unsigned int stride{(AvailableBasePixels * (BitsPerPixel + 1U) / BitsEncoded) - 1U};
 	unsigned char *const DecodedImageData{DecodedImage.data}, *const SourceImageData{SourceImage.data};
 
 	// Extracting Encoded bits
-	for(unsigned int i{0}, j{0}, BGR{0}, TransferredBits{0}; i < TotalDecodedImageChannels; ++BGR, ++j) {
+	for(unsigned int i{0}, j{0}, BGR{0}, TransferredBits{0}; i < TotalDecodedImageChannels && j < TotalBaseChannels - 21U; ++BGR, ++j) {
 		if(BGR == 3U) {
 			BGR = 0U;
 			j += stride * 3U;
