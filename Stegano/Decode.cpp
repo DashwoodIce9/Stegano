@@ -4,7 +4,7 @@
 
 namespace Stegano {
 
-bool Decode(const std::string& source, const std::string& OutputFilePath) {
+bool Decode(const std::string& source, const std::string& output) {
 	Stegano::Logger::Verbose("Reading source image", '\n');
 
 	cv::Mat SourceImage{cv::imread(source, cv::IMREAD_COLOR)};
@@ -100,9 +100,9 @@ bool Decode(const std::string& source, const std::string& OutputFilePath) {
 	Stegano::Logger::Verbose("Finished decoding", '\n', "Saving decoded image", '\n');
 
 	try {
-		cv::imwrite(OutputFilePath, DecodedImage,
+		cv::imwrite(output, DecodedImage,
 					std::vector<int>{cv::IMWRITE_PNG_COMPRESSION, 4, cv::IMWRITE_PNG_STRATEGY, cv::IMWRITE_PNG_STRATEGY_FILTERED});
-		Stegano::Logger::Log("Image saved at - ", OutputFilePath, '\n');
+		Stegano::Logger::Log("Image saved at - ", output, '\n');
 	}
 	catch(cv::Exception& e) {
 		if(e.code == -2) {
