@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <chrono>
 
 namespace Stegano {
 
@@ -21,7 +22,6 @@ class Logger {
 	}
 
 public:
-
 	template <typename... Args>
 	static void Log(const Args&... args) {
 		if(verbose || !quiet) {
