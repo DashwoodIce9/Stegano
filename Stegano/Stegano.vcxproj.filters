@@ -27,12 +27,21 @@
     <ClCompile Include="Handler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ParallelEncode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ParallelDecode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SteganoCommon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="SteganoLogger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SteganoThreadedCommon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

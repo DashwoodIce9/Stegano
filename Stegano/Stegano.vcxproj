@@ -154,10 +154,13 @@
     <ClCompile Include="Encode.cpp" />
     <ClCompile Include="Handler.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ParallelDecode.cpp" />
+    <ClCompile Include="ParallelEncode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SteganoCommon.h" />
     <ClInclude Include="SteganoLogger.h" />
+    <ClInclude Include="SteganoThreadedCommon.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

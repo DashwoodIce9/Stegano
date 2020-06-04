@@ -1,5 +1,6 @@
 #include <string>
 #include <limits>
+#include <thread>
 #include "SteganoLogger.h"
 
 #if _WIN32
@@ -9,7 +10,7 @@
 
 namespace Stegano {
 extern bool quiet{false}, verbose{false}, showimages{false};
-extern int threads{1};
+extern unsigned int threads{1U};
 
 #if _WIN32
 extern long DesktopWidth{0}, DesktopHeight{0};
@@ -35,6 +36,9 @@ inline bool Encode(const std::string& base, const std::string& source, const std
  * @return true => Success
  */
 inline bool Decode(const std::string& source, const std::string& output);
+inline bool ParallelEncode(const std::string& base, const std::string& source, const std::string& output, const bool& expandbase,
+						   const bool& force, const bool& noreduc, const bool& nograyscale);
+inline bool ParallelDecode(const std::string& source, const std::string& output);
 
 // Hold Screen
 static inline void hold() {
@@ -109,7 +113,7 @@ static inline void help() {
 			  << "\n\n\t";
 	std::cout << "9) threads (optional, default = 1, max = 512) - Enable multithreading with the specified number of threads."
 			  << "\n\t\t"
-			  << "If repeated, only the last value is considered. e.g. - Stegano.exe decode ..\\Encoded.png threads 8"
+			  << "Should be the last argument passed. e.g. - Stegano.exe decode ..\\Encoded.png threads 8"
 			  << "\n\n";
 	std::cout << "AUTHOR"
 			  << "\n\t"
@@ -177,15 +181,20 @@ static inline bool LoopThroughArgs(const int start, const int& argc, const char*
 		else if(std::string(argv[i]) == "/t" || std::string(argv[i]) == "/T" || std::string(argv[i]) == "threads") {
 			++i;
 			if(i < argc) {
-				threads = std::stoi(argv[i]);
-				if(threads < 1 || threads > 512) {
+				try {
+					threads = static_cast<unsigned int>(std::stoi(argv[i]));
+				}
+				catch(...) {
+					Stegano::Logger::Log('\n', "Improper value for threads passed, defaulting to single threaded operation.", '\n');
+					threads = 1;
+				}
+				if(threads < 1U || threads > 512U) {
 					Stegano::Logger::Log('\n', "Improper value for threads passed, defaulting to single threaded operation.", '\n');
 					threads = 1;
 				}
 			}
 			else {
-				Stegano::Logger::Log('\n', "Thread count value not found", '\n');
-				return false;
+				threads = 0U;
 			}
 		}
 		else if(std::string(argv[i]) == "/b" || std::string(argv[i]) == "/B" || std::string(argv[i]) == "base") {
@@ -277,11 +286,11 @@ static inline bool handler(const int& argc, const char** argv) {
 		else if(in == 'h' || in == 'H') {
 			std::cout << "\n\n";
 			help();
-			hold();
+			return true;
 		}
 		else {
 			Stegano::Logger::Error('\n', "Invalid input!", '\n');
-			hold();
+			return false;
 		}
 	}
 
@@ -297,14 +306,28 @@ static inline bool handler(const int& argc, const char** argv) {
 
 	Stegano::Logger::Verbose("Output file path = ", output, '\n');
 	showimages ? Stegano::Logger::Verbose("Show Images = ", "true", '\n') : Stegano::Logger::Verbose("Show Images = ", "false", '\n');
-	if(threads != 1) {
-		Stegano::Logger::Verbose("Thread count = ", threads, '\n');
-	}
-	std::cout << '\n';
-	// Add multithreading code
 
-	if(decode ? !Decode(Source, output) : !Encode(Base, Source, output, expandbase, force, noreduc, nograyscale)) {
-		return false;
+	if(threads == 0U) {
+		threads = std::thread::hardware_concurrency();
+	}
+
+	if(threads == 1U) {
+		if(decode ? !Decode(Source, output) : !Encode(Base, Source, output, expandbase, force, noreduc, nograyscale)) {
+			return false;
+		}
+	}
+	else {
+		if(threads > std::thread::hardware_concurrency()) {
+			threads = std::thread::hardware_concurrency();
+			Stegano::Logger::Log('\n',
+								 "Entered value of threads greater than supported by the platform. Setting thread count to maximum value "
+								 "this platform allows.",
+								 '\n');
+		}
+		Stegano::Logger::Verbose("Thread count = ", threads, "\n\n");
+		if(decode ? !ParallelDecode(Source, output) : !ParallelEncode(Base, Source, output, expandbase, force, noreduc, nograyscale)) {
+			return false;
+		}
 	}
 
 	return true;
@@ -317,6 +340,7 @@ static inline bool handler(const int& argc, const char** argv) {
  * @return 0 => Successful execution, 1 => Failure in execution
  */
 int run(const int& argc, const char** argv) {
+	auto start = std::chrono::high_resolution_clock::now();
 	if(!handler(argc, argv)) {
 		if(argc == 1) {
 			hold();
@@ -330,6 +354,11 @@ int run(const int& argc, const char** argv) {
 	}
 	else {
 		std::cout << '\n';
+	}
+	if(!showimages) {
+		auto end = std::chrono::high_resolution_clock::now();
+		const double timetaken = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()) / 1000.0;
+		Stegano::Logger::Verbose("Total execution took: ", timetaken, " seconds", "\n\n");
 	}
 	return 0;
 }
