@@ -81,6 +81,9 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 							 "Source image size = [", SourceImage.rows, " x ", SourceImage.cols, " x ", SourceImage.channels(), ']',
 							 "\n\n");
 	bool overflow{false};
+
+	auto start = std::chrono::high_resolution_clock::now();
+
 	if(BitsPerPixel >= 12U) {
 		if(!noreduc) {
 			if(expandbase) {
@@ -208,6 +211,8 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 		cv::namedWindow("Source", cv::WINDOW_AUTOSIZE);
 		cv::imshow("Source", SourceCopy);
 		cv::imshow("Base", BaseCopy);
+		cv::waitKey(0);
+		cv::destroyAllWindows();
 	}
 
 	Stegano::Logger::Verbose("Encoding now...", '\n');
@@ -247,9 +252,9 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 	}
 
 	const std::array<unsigned int, 3> bpch{BPCH[BitsPerPixel]};
-	const unsigned int TotalSourceImageChannels{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols * SourceImage.channels())};
+	const unsigned int TotalSourceChannels{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols * SourceImage.channels())};
 	unsigned char *const SourceImageData{SourceImage.data}, *const BaseImageData{BaseImage.data};
-	for(unsigned int i{0}, j{0}, TransferredBits{0}, BGR{0}; j < TotalSourceImageChannels && i < TotalBaseChannels - 21U; ++BGR, ++i) {
+	for(unsigned int i{0}, j{0}, TransferredBits{0}, BGR{0}; j < TotalSourceChannels && i < TotalBaseChannels - 21U; ++BGR, ++i) {
 		if(BGR == 3U) {
 			BGR = 0U;
 			i += stride * 3U;
@@ -307,6 +312,12 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 		cv::namedWindow("Encoded Base", cv::WINDOW_AUTOSIZE);
 		cv::imshow("Encoded Base", BaseImage);
 		cv::waitKey(0);
+	}
+
+	if(!showimages) {
+		auto end = std::chrono::high_resolution_clock::now();
+		const double timetaken = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()) / 1000.0;
+		Stegano::Logger::Verbose('\n', "Encoding took: ", timetaken, " seconds");
 	}
 
 	return true;

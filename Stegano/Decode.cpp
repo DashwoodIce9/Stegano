@@ -15,7 +15,7 @@ bool Decode(const std::string& source, const std::string& output) {
 							 "\n\n");
 
 	const unsigned int AvailableBasePixels{static_cast<unsigned int>(SourceImage.rows * SourceImage.cols - 7)};
-	const unsigned int TotalBaseChannels{AvailableBasePixels * 3U + 21U};
+	const unsigned int TotalSourceChannels{AvailableBasePixels * 3U + 21U};
 
 	// Reading Trailer
 	std::array<unsigned char, 5> trailer{0, 0, 0, 0, 0};
@@ -25,11 +25,11 @@ bool Decode(const std::string& source, const std::string& output) {
 			++i;
 		}
 		trailer[i] *= PowersOfTwo[2];
-		trailer[i] += static_cast<unsigned char>(SourceImage.data[TotalBaseChannels - ch] % 4U);
+		trailer[i] += static_cast<unsigned char>(SourceImage.data[TotalSourceChannels - ch] % 4U);
 	}
 
 	// Checking validity of the trailer
-	if((trailer[0] ^ trailer[1] ^ trailer[2] ^ trailer[3] ^ SourceImage.data[TotalBaseChannels - 1]) != trailer[4]) {
+	if((trailer[0] ^ trailer[1] ^ trailer[2] ^ trailer[3] ^ SourceImage.data[TotalSourceChannels - 1]) != trailer[4]) {
 		Stegano::Logger::Error("Error!", " The given image does not have any data embedded using this application", '\n');
 		return false;
 	}
@@ -41,7 +41,11 @@ bool Decode(const std::string& source, const std::string& output) {
 #endif
 		cv::namedWindow("Source", cv::WINDOW_AUTOSIZE);
 		cv::imshow("Source", SourceCopy);
+		cv::waitKey(0);
+		cv::destroyAllWindows();
 	}
+
+	auto start = std::chrono::high_resolution_clock::now();
 
 	Stegano::Logger::Verbose("Encoded image found, decoding...", '\n');
 
@@ -71,7 +75,7 @@ bool Decode(const std::string& source, const std::string& output) {
 	unsigned char *const DecodedImageData{DecodedImage.data}, *const SourceImageData{SourceImage.data};
 
 	// Extracting Encoded bits
-	for(unsigned int i{0}, j{0}, BGR{0}, TransferredBits{0}; i < TotalDecodedImageChannels && j < TotalBaseChannels - 21U; ++BGR, ++j) {
+	for(unsigned int i{0}, j{0}, TransferredBits{0}, BGR{0}; i < TotalDecodedImageChannels && j < TotalSourceChannels - 21U; ++BGR, ++j) {
 		if(BGR == 3U) {
 			BGR = 0U;
 			j += stride * 3U;
@@ -130,6 +134,12 @@ bool Decode(const std::string& source, const std::string& output) {
 		cv::namedWindow("Decoded Image", cv::WINDOW_AUTOSIZE);
 		cv::imshow("Decoded Image", DecodedImage);
 		cv::waitKey(0);
+	}
+
+	if(!showimages) {
+		auto end = std::chrono::high_resolution_clock::now();
+		const double timetaken = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()) / 1000.0;
+		Stegano::Logger::Verbose('\n', "Decoding took: ", timetaken, " seconds");
 	}
 
 	return true;
