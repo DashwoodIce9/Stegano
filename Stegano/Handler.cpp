@@ -1,3 +1,5 @@
+/* Copyright 2020 Prakhar Agarwal*/
+
 #include <string>
 #include <limits>
 #include <thread>
