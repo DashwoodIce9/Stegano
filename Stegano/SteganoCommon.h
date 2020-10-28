@@ -17,7 +17,7 @@ extern bool showimages;
 
 #if _WIN32
 extern long DesktopWidth, DesktopHeight;
-void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name);
+void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name, double extrashrinkfactor = 1.0);
 #endif
 
 }

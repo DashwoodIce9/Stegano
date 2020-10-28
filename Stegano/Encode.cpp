@@ -4,7 +4,6 @@
 
 /* TODO
 ** Add functionality to support images with FP16/32 channel types
-** Multithreading
 */
 
 namespace Stegano {
@@ -17,10 +16,11 @@ extern bool base, force, noreduc, nograyscale;
  * @param input -> Input image object
  * @param output -> Output image object
  * @param name -> Image name (for verbose logging)
+ * @param extrashrinkfactor -> Manual factor by which to shrink the images more than default
  */
-void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name) {
-	const double hRatio{static_cast<double>(DesktopWidth) / static_cast<double>(input.cols)};
-	const double vRatio{static_cast<double>(DesktopHeight) / static_cast<double>(input.rows)};
+void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name, double extrashrinkfactor) {
+	const double hRatio{extrashrinkfactor * static_cast<double>(DesktopWidth) / static_cast<double>(input.cols)};
+	const double vRatio{extrashrinkfactor * static_cast<double>(DesktopHeight) / static_cast<double>(input.rows)};
 	std::streamsize defaultprecision{std::cout.precision()};
 	std::cout.precision(3);
 	if(hRatio < 1.0) {
