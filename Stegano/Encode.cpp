@@ -199,6 +199,7 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 				Stegano::Logger::Log("Rerun without \"noreduc\" flag or choose a larger base image", '\n');
 				return false;
 			}
+			overflow = true;
 		}
 		BitsPerPixel = overflow ? 11U : BitsToEncode / AvailableBasePixels;
 	}
