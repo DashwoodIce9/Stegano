@@ -3,6 +3,7 @@
 #pragma once
 
 #include <array>
+#include <tuple>
 #include <opencv2/opencv.hpp>
 #include "SteganoLogger.h"
 
@@ -16,8 +17,6 @@ constexpr std::array<unsigned int, 9> PowersOfTwo{0x1, 0x2, 0x4, 0x8, 0x10, 0x20
 extern bool showimages;
 
 #if _WIN32
-extern long DesktopWidth, DesktopHeight;
-void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name, double extrashrinkfactor = 1.0);
+inline void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name, double extrashrinkfactor = 1.0);
 #endif
-
 }

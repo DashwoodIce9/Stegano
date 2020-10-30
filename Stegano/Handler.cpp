@@ -11,11 +11,11 @@
 #endif
 
 namespace Stegano {
-extern bool quiet{false}, verbose{false}, showimages{false};
-extern unsigned int threads{1U};
+bool quiet{false}, verbose{false}, showimages{false}, expandbase{false}, force{false}, noreduc{false}, nograyscale{false};
+unsigned int threads{1U};
 
 #if _WIN32
-extern long DesktopWidth{0}, DesktopHeight{0};
+long DesktopWidth{0}, DesktopHeight{0};
 #endif
 
 /**
@@ -29,8 +29,7 @@ extern long DesktopWidth{0}, DesktopHeight{0};
  * @param nograyscale -> Disables conversion to grayscale during reduction phase
  * @return true => Success
  */
-inline bool Encode(const std::string& base, const std::string& source, const std::string& output, const bool& expandbase, const bool& force,
-				   const bool& noreduc, const bool& nograyscale);
+inline bool Encode(const std::string& base, const std::string& source, const std::string& output);
 /**
  * @brief Decodes the hidden image in source image
  * @param source -> Source image path
@@ -38,8 +37,7 @@ inline bool Encode(const std::string& base, const std::string& source, const std
  * @return true => Success
  */
 inline bool Decode(const std::string& source, const std::string& output);
-inline bool ParallelEncode(const std::string& base, const std::string& source, const std::string& output, const bool& expandbase,
-						   const bool& force, const bool& noreduc, const bool& nograyscale);
+inline bool ParallelEncode(const std::string& base, const std::string& source, const std::string& output);
 inline bool ParallelDecode(const std::string& source, const std::string& output);
 
 // Hold Screen
@@ -142,8 +140,7 @@ static inline void invalidargs() {
  * @param nograyscale -> Sets nograyscale boolean
  * @return true => Success
  */
-static inline bool LoopThroughArgs(const int start, const int& argc, const char** argv, std::string* output, bool* expandbase, bool* force,
-								   bool* noreduc, bool* nograyscale) {
+static inline bool LoopThroughArgs(const int start, const int& argc, const char** argv, std::string* output) {
 	for(int i = start; i < argc; ++i) {
 		if(std::string(argv[i]) == "/o" || std::string(argv[i]) == "/O" || std::string(argv[i]) == "output") {
 			++i;
@@ -172,13 +169,13 @@ static inline bool LoopThroughArgs(const int start, const int& argc, const char*
 			showimages = true;
 		}
 		else if(std::string(argv[i]) == "/ng" || std::string(argv[i]) == "/NG" || std::string(argv[i]) == "nograyscale") {
-			*nograyscale = true;
+			nograyscale = true;
 		}
 		else if(std::string(argv[i]) == "/f" || std::string(argv[i]) == "/F" || std::string(argv[i]) == "force") {
-			*force = true;
+			force = true;
 		}
 		else if(std::string(argv[i]) == "/nr" || std::string(argv[i]) == "/NR" || std::string(argv[i]) == "noreduc") {
-			*noreduc = true;
+			noreduc = true;
 		}
 		else if(std::string(argv[i]) == "/t" || std::string(argv[i]) == "/T" || std::string(argv[i]) == "threads") {
 			++i;
@@ -200,7 +197,7 @@ static inline bool LoopThroughArgs(const int start, const int& argc, const char*
 			}
 		}
 		else if(std::string(argv[i]) == "/b" || std::string(argv[i]) == "/B" || std::string(argv[i]) == "base") {
-			*expandbase = true;
+			expandbase = true;
 		}
 		else {
 			return false;
@@ -216,7 +213,7 @@ static inline bool LoopThroughArgs(const int start, const int& argc, const char*
  * @return true => Success
  */
 static inline bool handler(const int& argc, const char** argv) {
-	bool decode{false}, expandbase{false}, force{false}, noreduc{false}, nograyscale{false};
+	bool decode{false};
 	std::string Base, Source, output{"Encoded.png"};
 
 	if(argc > 1) {
@@ -230,7 +227,7 @@ static inline bool handler(const int& argc, const char** argv) {
 				decode = true;
 				Source = argv[2];
 				output = "Decoded.png";
-				if(!LoopThroughArgs(3, argc, argv, &output, &expandbase, &force, &noreduc, &nograyscale)) {
+				if(!LoopThroughArgs(3, argc, argv, &output)) {
 					invalidargs();
 					return false;
 				}
@@ -242,7 +239,7 @@ static inline bool handler(const int& argc, const char** argv) {
 				}
 				Base = argv[2];
 				Source = argv[3];
-				if(!LoopThroughArgs(4, argc, argv, &output, &expandbase, &force, &noreduc, &nograyscale)) {
+				if(!LoopThroughArgs(4, argc, argv, &output)) {
 					invalidargs();
 					return false;
 				}
@@ -314,7 +311,7 @@ static inline bool handler(const int& argc, const char** argv) {
 	}
 
 	if(threads == 1U) {
-		if(decode ? !Decode(Source, output) : !Encode(Base, Source, output, expandbase, force, noreduc, nograyscale)) {
+		if(decode ? !Decode(Source, output) : !Encode(Base, Source, output)) {
 			return false;
 		}
 	}
@@ -327,7 +324,7 @@ static inline bool handler(const int& argc, const char** argv) {
 								 '\n');
 		}
 		Stegano::Logger::Verbose("Thread count = ", threads, "\n\n");
-		if(decode ? !ParallelDecode(Source, output) : !ParallelEncode(Base, Source, output, expandbase, force, noreduc, nograyscale)) {
+		if(decode ? !ParallelDecode(Source, output) : !ParallelEncode(Base, Source, output)) {
 			return false;
 		}
 	}

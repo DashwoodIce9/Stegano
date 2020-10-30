@@ -4,10 +4,9 @@
 
 namespace Stegano {
 
-extern bool base, force, noreduc, nograyscale;
+extern bool expandbase, force, noreduc, nograyscale;
 
-bool ParallelEncode(const std::string& base, const std::string& source, const std::string& output, const bool& expandbase,
-					const bool& force, const bool& noreduc, const bool& nograyscale) {
+bool ParallelEncode(const std::string& base, const std::string& source, const std::string& output) {
 	Stegano::Logger::Verbose("Exapnd base = ", expandbase ? "true" : "false", '\n');
 	Stegano::Logger::Verbose("No reduction = ", noreduc ? "true" : "false", '\n');
 	Stegano::Logger::Verbose("No grayscale = ", nograyscale ? "true" : "false", '\n');
@@ -237,6 +236,7 @@ bool ParallelEncode(const std::string& base, const std::string& source, const st
 
 	std::vector<std::thread> thread_pool;
 	thread_pool.reserve(threads);
+	display.join();
 	for(unsigned int k{0}; k < threads; ++k) {
 		thread_pool.emplace_back(
 			std::thread([k, &stride, &bpch, &BitsPerPixel, &BaseImageData, &SourceImageData, &TotalSourceChannels, &TotalBaseChannels] {
@@ -349,7 +349,6 @@ bool ParallelEncode(const std::string& base, const std::string& source, const st
 		}
 	});
 
-	display.join();
 	if(showimages) {
 #if _WIN32
 		ResizeToSmall(BaseImage, BaseImage, "Encoded Image");

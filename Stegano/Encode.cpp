@@ -8,9 +8,10 @@
 
 namespace Stegano {
 
-extern bool base, force, noreduc, nograyscale;
+extern bool expandbase, force, noreduc, nograyscale;
 
 #if _WIN32
+extern long DesktopWidth, DesktopHeight;
 /**
  * @brief Resizes display images to fit the screen. Resizes only displayed images not the one saved on disk.
  * @param input -> Input image object
@@ -21,7 +22,7 @@ extern bool base, force, noreduc, nograyscale;
 void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& name, double extrashrinkfactor) {
 	const double hRatio{extrashrinkfactor * static_cast<double>(DesktopWidth) / static_cast<double>(input.cols)};
 	const double vRatio{extrashrinkfactor * static_cast<double>(DesktopHeight) / static_cast<double>(input.rows)};
-	std::streamsize defaultprecision{std::cout.precision()};
+	auto defaultprecision{std::cout.precision()};
 	std::cout.precision(3);
 	if(hRatio < 1.0) {
 		Stegano::Logger::Verbose(name, " too large to display, constrained ");
@@ -42,8 +43,7 @@ void ResizeToSmall(const cv::Mat& input, cv::Mat& output, const std::string& nam
 }
 #endif
 
-bool Encode(const std::string& base, const std::string& source, const std::string& output, const bool& expandbase, const bool& force,
-			const bool& noreduc, const bool& nograyscale) {
+bool Encode(const std::string& base, const std::string& source, const std::string& output) {
 	Stegano::Logger::Verbose("Exapnd base = ", expandbase ? "true" : "false", '\n');
 	Stegano::Logger::Verbose("No reduction = ", noreduc ? "true" : "false", '\n');
 	Stegano::Logger::Verbose("No grayscale = ", nograyscale ? "true" : "false", '\n');
