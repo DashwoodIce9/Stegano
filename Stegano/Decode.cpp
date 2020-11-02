@@ -47,7 +47,7 @@ bool Decode(const std::string& source, const std::string& output) {
 		cv::destroyAllWindows();
 	}
 
-	auto start = std::chrono::high_resolution_clock::now();
+	auto start = std::chrono::steady_clock::now();
 
 	Stegano::Logger::Verbose("Encoded image found, decoding...", '\n');
 
@@ -139,7 +139,7 @@ bool Decode(const std::string& source, const std::string& output) {
 	}
 
 	if(!showimages) {
-		auto end = std::chrono::high_resolution_clock::now();
+		auto end = std::chrono::steady_clock::now();
 		const double timetaken = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()) / 1000.0;
 		Stegano::Logger::Verbose('\n', "Decoding took: ", timetaken, " seconds");
 	}

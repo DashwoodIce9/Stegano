@@ -58,7 +58,7 @@ bool ParallelEncode(const std::string& base, const std::string& source, const st
 							 "\n\n");
 	bool overflow{false};
 
-	auto start = std::chrono::high_resolution_clock::now();
+	auto start = std::chrono::steady_clock::now();
 
 	if(BitsPerPixel >= 12U) {
 		if(!noreduc) {
@@ -361,7 +361,7 @@ bool ParallelEncode(const std::string& base, const std::string& source, const st
 	saveimage.join();
 
 	if(!showimages) {
-		auto end = std::chrono::high_resolution_clock::now();
+		auto end = std::chrono::steady_clock::now();
 		const double timetaken = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()) / 1000.0;
 		Stegano::Logger::Verbose('\n', "Encoding took: ", timetaken, " seconds");
 	}

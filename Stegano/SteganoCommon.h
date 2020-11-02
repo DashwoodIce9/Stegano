@@ -4,6 +4,7 @@
 
 #include <array>
 #include <tuple>
+#include <chrono>
 #include <opencv2/opencv.hpp>
 #include "SteganoLogger.h"
 

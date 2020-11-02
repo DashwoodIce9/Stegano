@@ -3,6 +3,7 @@
 #include <string>
 #include <limits>
 #include <thread>
+#include <chrono>
 #include "SteganoLogger.h"
 
 #if _WIN32
@@ -339,7 +340,7 @@ static inline bool handler(const int& argc, const char** argv) {
  * @return 0 => Successful execution, 1 => Failure in execution
  */
 int run(const int& argc, const char** argv) {
-	auto start = std::chrono::high_resolution_clock::now();
+	auto start = std::chrono::steady_clock::now();
 	if(!handler(argc, argv)) {
 		if(argc == 1) {
 			hold();
@@ -355,7 +356,7 @@ int run(const int& argc, const char** argv) {
 		std::cout << '\n';
 	}
 	if(!showimages) {
-		auto end = std::chrono::high_resolution_clock::now();
+		auto end = std::chrono::steady_clock::now();
 		const double timetaken = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()) / 1000.0;
 		Stegano::Logger::Verbose("Total execution took: ", timetaken, " seconds", "\n\n");
 	}
