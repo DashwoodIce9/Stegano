@@ -1,6 +1,8 @@
 /* Copyright 2020 Prakhar Agarwal*/
 
 #include "SteganoCommon.h"
+#include <opencv2/quality.hpp>
+#include <cmath>
 
 /* TODO
 ** Add functionality to support images with FP16/32 channel types
@@ -72,6 +74,8 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 							   " Cannot operate on images with dimensions greater than [65536 x 65536].", '\n');
 		return false;
 	}
+
+	cv::Mat BaseImageCopy{BaseImage.clone()};
 
 	// Using 7 pixels for the trailer (see definition below)
 	unsigned int AvailableBasePixels{static_cast<unsigned int>(BaseImage.rows * BaseImage.cols - 7)};
@@ -308,6 +312,22 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 		}
 	}
 
+	if(!showimages) {
+		auto end = std::chrono::high_resolution_clock::now();
+		const double timetaken = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()) / 1000.0;
+		Stegano::Logger::Verbose('\n', "Encoding took: ", timetaken, " seconds");
+	}
+
+	auto MSE = cv::quality::QualityMSE::compute(BaseImage, BaseImageCopy, cv::noArray());
+	Stegano::Logger::Verbose("\n\n", "Per channel MSE = ", MSE, '\n', "Total MSE = ", (MSE[0] + MSE[1] + MSE[2]) / 3);
+
+	auto PSNR = cv::quality::QualityPSNR::compute(BaseImage, BaseImageCopy, cv::noArray());
+	uint32_t temp{255 * 255 * 4};
+	Stegano::Logger::Verbose("\n\n", "Per channel PSNR = ", PSNR, '\n', "Total PSNR = ", 10.0 * log10(temp / (MSE[0] + MSE[1] + MSE[2])));
+
+	auto SSIM = cv::quality::QualitySSIM::compute(BaseImage, BaseImageCopy, cv::noArray());
+	Stegano::Logger::Verbose("\n\n", "Per channel SSIM = ", SSIM, '\n', "Total SSIM = ", (SSIM[0] + SSIM[1] + SSIM[2]) / 3, '\n');
+
 	if(showimages) {
 #if _WIN32
 		ResizeToSmall(BaseImage, BaseImage, "Encoded Image");
@@ -315,12 +335,12 @@ bool Encode(const std::string& base, const std::string& source, const std::strin
 		cv::namedWindow("Encoded Base", cv::WINDOW_AUTOSIZE);
 		cv::imshow("Encoded Base", BaseImage);
 		cv::waitKey(0);
-	}
-
-	if(!showimages) {
-		auto end = std::chrono::high_resolution_clock::now();
-		const double timetaken = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()) / 1000.0;
-		Stegano::Logger::Verbose('\n', "Encoding took: ", timetaken, " seconds");
+		cv::destroyAllWindows();
+		cv::subtract(BaseImage, BaseImageCopy, BaseImageCopy);
+		BaseImageCopy *= 17;
+		cv::namedWindow("Normalized Difference between the images", cv::WINDOW_AUTOSIZE);
+		cv::imshow("Normalized Difference between the images", BaseImageCopy);
+		cv::waitKey(0);
 	}
 
 	return true;
